@@ -1,0 +1,16 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { BriefcaseIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { Job, useWorkerData, statusLabel } from './workerData';
+import { DataState, RefreshButton, WorkerHeading } from './WorkerUI';
+import WorkerJobDetails, { JobCard } from './WorkerJobDetails';
+export default function WorkerJobs() {
+  const { data, loading, error, reload } = useWorkerData<Job[]>('/api/worker/my-jobs'); const [filter, setFilter] = useState('all'); const [search, setSearch] = useState(''); const [selected, setSelected] = useState<Job | null>(null);
+  const [params, setParams] = useSearchParams(); const bookingId = params.get('booking');
+  useEffect(() => { if (bookingId && data) setSelected(data.find(job => job._id === bookingId) || null); }, [bookingId, data]);
+  const closeDetails = () => { setSelected(null); if (bookingId) { const next = new URLSearchParams(params); next.delete('booking'); setParams(next, { replace: true }); } };
+  const jobs = useMemo(() => (data || []).filter(job => (filter === 'all' || job.status === filter) && `${job.service?.name} ${job.user?.name} ${job.address || ''} ${job._id}`.toLowerCase().includes(search.toLowerCase())), [data, filter, search]);
+  return <div className="worker-space"><WorkerHeading eyebrow="Your assignments" title="Jobs" description="Your schedule, service details and job updates in one place."><RefreshButton onClick={reload} loading={loading} /></WorkerHeading><div className="worker-panel"><div className="worker-toolbar"><div className="flex flex-wrap gap-1.5">{['all', 'pending', 'confirmed', 'in-progress', 'completed', 'cancelled'].map(value => <button key={value} className={'worker-filter ' + (filter === value ? 'selected' : '')} onClick={() => setFilter(value)}>{value === 'all' ? 'All jobs' : statusLabel(value)} <span className="opacity-60">{data?.filter(job => value === 'all' || job.status === value).length ?? '—'}</span></button>)}</div><label className="relative min-w-0"><MagnifyingGlassIcon className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input className="worker-input pl-9" aria-label="Search assignments" placeholder="Search service, customer or address" value={search} onChange={e => setSearch(e.target.value)} /></label></div></div><DataState loading={loading} error={error} retry={reload} />{bookingId && data && !data.some(job => job._id === bookingId) && !loading && !error && <p role="status" className="worker-note">This assignment is no longer available to your account. Your current assignments are shown below.</p>}{!loading && !error && (jobs.length ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{jobs.map(job => <JobCard key={job._id} job={job} onOpen={() => setSelected(job)} />)}</div> : <div className="worker-panel worker-empty"><BriefcaseIcon className="mx-auto mb-3 h-9 w-9 text-blue-500" /><h2 className="font-bold">{search || filter !== 'all' ? 'No matching assignments' : 'Ready for your next assignment'}</h2><p className="mt-1 text-sm text-slate-500">{search || filter !== 'all' ? 'Try another search or job status.' : 'Jobs appear here when your administrator assigns them to you.'}</p></div>)}{selected && <WorkerJobDetails job={selected} onClose={closeDetails} onUpdated={reload} />}</div>;
+}
+
+

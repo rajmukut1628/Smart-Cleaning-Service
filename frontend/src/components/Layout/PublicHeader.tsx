@@ -1,0 +1,6 @@
+import { NavLink, Link } from 'react-router-dom';
+import { ArrowUpRight, Sparkles } from 'lucide-react';
+const links = [{to:'/services',label:'Services'},{to:'/how-it-works',label:'How It Works'},{to:'/reviews',label:'Reviews'},{to:'/contact',label:'Contact'}];
+export default function PublicHeader() {
+  return <header className="site-header public-site-header"><div className="public-header-inner"><Link to="/" aria-label="Smart Cleaning Service home" className="public-brand"><span className="public-brand-icon"><Sparkles size={23}/></span><span><strong>Smart Cleaning Service</strong><small>Thoughtful care. Beautiful spaces.</small></span></Link><nav aria-label="Main navigation" className="public-desktop-nav">{links.map(item=><NavLink key={item.to} to={item.to} className={({isActive})=>'public-nav-link '+(isActive?'active':'')}>{item.label}</NavLink>)}</nav><div className="public-account-links"><Link to="/login" className="public-login">Login</Link><Link to="/register" className="public-register">Sign up <ArrowUpRight size={14}/></Link></div></div><nav aria-label="Mobile navigation" className="public-mobile-nav">{links.map(item=><NavLink key={item.to} to={item.to} className={({isActive})=>'public-nav-link '+(isActive?'active':'')}>{item.label}</NavLink>)}</nav></header>;
+}
