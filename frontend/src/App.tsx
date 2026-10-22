@@ -4,6 +4,7 @@ import React from 'react';
 import { scrollToSection } from './utils/scrollToSection';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginForm from './components/Auth/LoginForm';
+import ForgotPasswordForm from './components/Auth/ForgotPasswordForm';
 import RegistrationForm from './components/Auth/RegistrationForm';
 import Header from './components/Layout/Header';
 import PublicHeader from './components/Layout/PublicHeader';
@@ -75,6 +76,7 @@ function AppContent() {
           <Route path="/contact" element={<><PublicHeader /><ContactPage /></>} />
           <Route path="/reviews" element={<><PublicHeader /><ReviewsPage /></>} />
           <Route path="/how-it-works" element={<><PublicHeader /><HowItWorksPage /></>} />
+          <Route path="/forgot-password" element={<ForgotPasswordForm />} />
           <Route path="/login" element={<LoginForm onSwitchPage={() => navigate('/register')} />} />
           <Route path="/register" element={<RegistrationForm onSwitchPage={() => navigate('/login')} />} />
           <Route path="*" element={<><PublicHeader /><NotFoundPage /></>} />

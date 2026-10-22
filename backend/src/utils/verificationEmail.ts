@@ -11,7 +11,10 @@ export function verificationEmail(name: string, code: string) {
 }
 
 export async function sendVerificationEmail(email: string, name: string, code: string) {
-  const message = verificationEmail(name, code);
+  return sendTransactionalEmail(email, name, verificationEmail(name, code));
+}
+
+export async function sendTransactionalEmail(email: string, name: string, message: { subject: string; text: string; html: string }) {
   const fromEmail = process.env.MAIL_FROM_EMAIL?.trim() || process.env.SMTP_USER?.trim();
   const fromName = process.env.MAIL_FROM_NAME?.trim() || 'Smart Cleaning Service';
   if (!fromEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) throw Object.assign(new Error('Verification email is not configured. Contact support.'), { status: 503 });

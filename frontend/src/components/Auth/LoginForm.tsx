@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
@@ -39,6 +40,7 @@ export default function LoginForm({ onSwitchPage }: LoginFormProps) {
     <form className="auth-fields" onSubmit={handleSubmit}>
       <label className="auth-field" htmlFor="email"><span>Email address</span><input id="email" name="email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label>
       <label className="auth-field" htmlFor="password"><span>Password</span><div className="auth-password"><input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlashIcon /> : <EyeIcon />}</button></div></label>
+      <Link className="auth-forgot-link" to="/forgot-password">Forgot password?</Link>
       {error && <div role="alert" className="auth-error">{error}</div>}
       <button type="submit" disabled={isLoading} className="auth-submit">{isLoading ? 'Signing in...' : 'Sign in'}<ArrowRight size={15} /></button>
     </form>

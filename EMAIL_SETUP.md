@@ -46,3 +46,11 @@ The code does not claim email delivery until the provider accepts the request. P
 Preview: `docs/verification-email-preview.html` (sample name/code only).
 
 Official references: [Render Free limitations](https://render.com/docs/free), [Nodemailer SMTP](https://nodemailer.com/smtp), [Brevo transactional API](https://developers.brevo.com/docs/send-a-transactional-email).
+
+## Password recovery
+
+The sign-in page links to `/forgot-password`. `POST /api/auth/forgot-password` accepts an account email and returns a generic response with an opaque verification ID. Email delivery uses the same Brevo or SMTP settings above; no new credentials are required. Eligible password accounts, including customer and staff accounts, receive a six-digit code. Google-only and blocked accounts cannot reset a local password.
+
+`POST /api/auth/reset-password` takes `verificationId`, `code`, `password`, and `confirmPassword`. Codes expire after 10 minutes, allow at most five attempts, have a 60-second resend cooldown, and are consumed once. A successful reset changes only the password, increments the account session version, disconnects existing sockets, and sends a password-change notice. It never changes the role or ownership or automatically signs in. Unknown emails receive the same public response to avoid revealing account existence.
+
+Test email delivery after deployment using an existing password account you control; check Inbox and Spam. Actual emails are mocked in the automated regression tests.
