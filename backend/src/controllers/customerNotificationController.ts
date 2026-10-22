@@ -12,13 +12,15 @@ export function buildCustomerNotifications(bookings: any[]) {
     const day = new Date(booking.scheduledDate).toISOString().slice(0, 10);
     const createdAt = new Date(booking.updatedAt || booking.createdAt).toISOString();
     items.push({ id: key('customer-booking', id, booking.status, day, booking.scheduledTime, booking.address, String(booking.worker || ''), (booking.workers || []).map(String).sort()), type: 'booking', title: titles[booking.status] || 'Booking updated', message: `${service} · ${day} at ${booking.scheduledTime}. Open your booking to see its current details.`, createdAt, href: `/user-dashboard?booking=${id}`, read: false });
+    if(booking.cancellation?.id)items.push({id:key('cancellation',id,booking.cancellation.id,booking.cancellation.status),type:'booking',title:'Cancellation request '+booking.cancellation.status,message:'Open your booking to view the cancellation decision.',createdAt:new Date(booking.cancellation.decidedAt||booking.cancellation.requestedAt).toISOString(),href:'/user-dashboard?booking='+id,read:false});
+    if(booking.reschedule?.id)items.push({id:key('reschedule',id,booking.reschedule.id,booking.reschedule.status),type:'booking',title:'Schedule request '+booking.reschedule.status,message:booking.reschedule.status==='approved'?'Your new cleaning schedule is confirmed.':'Open your booking to view the schedule request.',createdAt:new Date(booking.reschedule.decidedAt||booking.reschedule.requestedAt).toISOString(),href:'/user-dashboard?booking='+id,read:false});
     if (booking.paymentStatus === 'paid') items.push({ id: key('customer-payment', id, booking.paymentConfirmedAt || 'confirmed'), type: 'payment', title: 'Your cash payment is confirmed', message: `The cash payment for ${service} has been confirmed. View your booking for payment details.`, createdAt: new Date(booking.paymentConfirmedAt || createdAt).toISOString(), href: `/user-dashboard?booking=${id}`, read: false });
     if (booking.status === 'completed' && !booking.isReviewed && booking.worker) items.push({ id: key('customer-review-invitation', id), type: 'review', title: 'How was your cleaning?', message: `Your ${service} is complete. Share your experience with a customer review.`, createdAt: new Date(booking.completedAt || createdAt).toISOString(), href: `/user-dashboard?review=${id}`, read: false });
   }
   return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
 }
 async function inbox(customerId: unknown) {
-  const bookings = await Booking.find({ user: customerId }).select('_id service status scheduledDate scheduledTime address worker workers paymentStatus paymentConfirmedAt isReviewed completedAt createdAt updatedAt').populate('service', 'name').sort({ updatedAt: -1 }).limit(50).lean();
+  const bookings = await Booking.find({ user: customerId }).select('_id service status scheduledDate scheduledTime address worker workers paymentStatus paymentConfirmedAt isReviewed completedAt createdAt updatedAt reschedule cancellation').populate('service', 'name').sort({ updatedAt: -1 }).limit(50).lean();
   return buildCustomerNotifications(bookings);
 }
 export async function getCustomerNotifications(req: CustomerRequest, res: Response) {

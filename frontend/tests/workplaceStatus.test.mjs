@@ -1,0 +1,5 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {workplaceStatus} from '../src/utils/workplaceStatus.ts';
+test('completed work remains cash pending until receipt is confirmed',()=>{assert.equal(workplaceStatus({status:'completed',paymentStatus:'pending'}).key,'cash-pending');assert.equal(workplaceStatus({status:'completed',paymentStatus:'paid'}).key,'fully-completed');});
+test('paid flag alone never marks unfinished work fully completed',()=>assert.equal(workplaceStatus({status:'in-progress',paymentStatus:'paid'}).key,'in-progress'));
+test('assignment handles primary and secondary workers and ignores empty team entries',()=>{assert.equal(workplaceStatus({status:'confirmed',worker:{}}).key,'assigned');assert.equal(workplaceStatus({status:'confirmed',workers:[null,{}]}).key,'assigned');assert.equal(workplaceStatus({status:'pending',workers:[null]}).key,'unassigned');});
+test('cancelled jobs remain cancelled despite payment or assignment',()=>assert.equal(workplaceStatus({status:'cancelled',paymentStatus:'paid',worker:{}}).key,'cancelled'));

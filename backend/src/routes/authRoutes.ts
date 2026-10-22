@@ -1,3 +1,4 @@
+import {limitSignIn} from '../middleware/loginRateLimit';
 import express from 'express';
 import { forgotPassword, resetPassword } from '../controllers/passwordResetController';
 import { loginUser, googleAuth } from '../controllers/authController';
@@ -10,10 +11,10 @@ const router = express.Router();
 router.post('/register', limitRegistrationEmails, registerUser);
 router.post('/register/verify', verifyRegistration);
 router.post('/register/resend', limitRegistrationEmails, resendVerification);
-router.post('/login', loginUser);
+router.post('/login', limitSignIn, loginUser);
 router.post('/forgot-password', limitRegistrationEmails, forgotPassword);
 router.post('/reset-password', limitRegistrationEmails, resetPassword);
-router.post('/google', googleAuth);
-router.post('/google/register', googleRegister);
+router.post('/google', limitSignIn, googleAuth);
+router.post('/google/register', limitSignIn, googleRegister);
 
 export default router;

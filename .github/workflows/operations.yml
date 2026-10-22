@@ -1,0 +1,56 @@
+name: Scheduled backups and uptime checks
+on:
+  workflow_dispatch:
+    inputs:
+      backup:
+        description: Download an encrypted backup
+        type: boolean
+        default: false
+  schedule:
+    - cron: '*/30 * * * *'
+    - cron: '0 3 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: operations-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  monitor:
+    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_AUTOMATED_OPS == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: .monitor-state.json
+          key: monitor-state-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: monitor-state-${{ github.ref_name }}-
+      - name: Check website and database health
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          API_URL: ${{ vars.API_URL }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          MAIL_FROM_EMAIL: ${{ secrets.MAIL_FROM_EMAIL }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: node backend/scripts/hosted-operations.cjs monitor
+      - name: Create daily encrypted backup
+        if: always() && ((github.event_name == 'workflow_dispatch' && inputs.backup) || github.event.schedule == '0 3 * * *')
+        env:
+          API_URL: ${{ vars.API_URL }}
+          OPERATIONS_AUTOMATION_KEY: ${{ secrets.OPERATIONS_AUTOMATION_KEY }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          FORCE_BACKUP: 'true'
+        run: node backend/scripts/hosted-operations.cjs backup
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: encrypted-database-backup-${{ github.run_id }}
+          path: backup-output/*.scsbackup
+          if-no-files-found: ignore
+          retention-days: 30
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .monitor-state.json
+          key: monitor-state-${{ github.ref_name }}-${{ github.run_id }}

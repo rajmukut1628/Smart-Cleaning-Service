@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { CalendarDays, MapPin, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import BookingDialog from '../Services/BookingDialog';
 interface Customer { _id: string; name: string; email?: string; phone?: string; address?: string; role?: string }
 interface UnitConfig { unitType: string; label: string; options?: { label: string; value: number }[]; allowCustom?: boolean }
@@ -56,7 +56,7 @@ export default function CreateBookingModal({ onBookingCreated }: { onBookingCrea
       if (!customerId) { setError('Select a customer for this booking.');return; }
       await axios.post('/api/admin/bookings', { user: customerId, service: form.service, worker: form.worker || undefined, address: form.address.trim(), squareFootage: Number(form.units), scheduledDate: form.date, scheduledTime: form.time, totalAmount: total });
       onBookingCreated();toast.success('Booking created successfully.');setOpen(false);setForm({ customer: '', service: '', worker: '', address: '', units: '1', date: '', time: '09:00' });setIsNew(false);setCustom(false);
-    } catch (err) { setError(axios.isAxiosError(err) ? err.response?.data?.message || 'Could not create the booking. Please try again.' : 'Could not create the booking.'); }
+    } catch (err) { setError(axios.isAxiosError(err) ? (axios.isAxiosError<{message:string}>(err)?err.response?.data.message:undefined) || 'Could not create the booking. Please try again.' : 'Could not create the booking.'); }
     finally { setBusy(false); }
   };
   if (!isAdmin) return null;

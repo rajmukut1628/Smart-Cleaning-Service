@@ -39,6 +39,7 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
     } = req.body;
     const userId = req.user?.userId || req.user?._id;
 
+    if(email!==undefined&&String(email).trim().toLowerCase()!==req.user.email)return res.status(400).json({message:'Use the verified email-change process. Customer email cannot be edited here.'});
     // Check if email is already taken by another user
     if (email) {
       const existingUser = await User.findOne({ email, _id: { $ne: userId } });
@@ -51,7 +52,7 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
       userId,
       {
         name,
-        email,
+        email:req.user.email,
         phone,
         address,
         familySize,
@@ -121,7 +122,7 @@ export const changePassword = async (req: AuthenticatedRequest, res: Response) =
       return res.status(400).json({ message: 'Please provide current and new password' });
     }
 
-    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || Buffer.byteLength(newPassword)>72) {
       return res.status(400).json({ message: 'New password must be at least 8 characters' });
     }
 
@@ -146,9 +147,12 @@ export const changePassword = async (req: AuthenticatedRequest, res: Response) =
     // Hash new password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
+    user.sessionVersion=(user.sessionVersion||0)+1;
     await user.save();
 
-    res.json({ message: 'Password updated successfully' });
+    req.app?.get('io')?.to('user:'+user._id).emit('session-revoked');
+    req.app?.get('io')?.in('user:'+user._id).disconnectSockets(true);
+    res.json({ message: 'Password updated. Please sign in again.',reauthenticate:true });
   } catch (error: any) {
     res.status(500).json({ message: 'Failed to change password', error: error.message });
   }

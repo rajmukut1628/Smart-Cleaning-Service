@@ -1,3 +1,5 @@
+import {requestCancellation,decideCancellation} from '../controllers/cancellationController';
+import {bookingHistory,paymentReceipt,requestReschedule,decideReschedule} from '../controllers/bookingExperienceController';
 import express from 'express';
 import { 
   createBooking, 
@@ -28,4 +30,10 @@ router.route('/:id/after-images').post(protect, uploadAfterImages);
 // Route to repeat a booking
 router.route('/:id/repeat').post(protect, repeatBooking);
 
+router.get('/:id/history',protect,bookingHistory);
+router.get('/:id/receipt',protect,paymentReceipt);
+router.post('/:id/reschedule',protect,customerOnly,requestReschedule);
+router.patch('/:id/reschedule',protect,decideReschedule);
+router.post('/:id/cancellation',protect,customerOnly,requestCancellation);
+router.patch('/:id/cancellation',protect,decideCancellation);
 export default router;

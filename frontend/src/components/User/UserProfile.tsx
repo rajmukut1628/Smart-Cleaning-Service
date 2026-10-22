@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Camera, Check, Loader2, Mail, MapPin, Pencil, Phone, ShieldCheck, UserRound, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import { imageUrl } from '../../utils/imageUrl';
 import './user-profile.css';
 
@@ -12,7 +12,7 @@ interface Profile {
   profilePicture?: string; role: string; authProvider?: string; emailVerifiedAt?: string; createdAt?: string;
 }
 const date = (value?: string) => value && !Number.isNaN(Date.parse(value)) ? new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not available';
-const errorMessage = (error: unknown) => axios.isAxiosError(error) ? error.response?.data?.message || 'Unable to load your information. Please try again.' : 'Something went wrong. Please try again.';
+const errorMessage = (error: unknown) => axios.isAxiosError(error) ? (axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Unable to load your information. Please try again.' : 'Something went wrong. Please try again.';
 
 export default function UserProfile() {
   const { user, updateUserProfile } = useAuth();

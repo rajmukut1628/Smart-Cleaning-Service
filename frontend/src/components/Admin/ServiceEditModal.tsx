@@ -24,7 +24,7 @@ export default function ServiceEditModal({ service, onClose, onSuccess }: Servic
     image: '',
     features: '', // Comma-separated string
   });
-  const [unitConfigs, setUnitConfigs] = useState<any[]>([]);
+  const [unitConfigs, setUnitConfigs] = useState<{_id:string;unitType:string;label:string}[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -57,12 +57,10 @@ export default function ServiceEditModal({ service, onClose, onSuccess }: Servic
         duration: String(service.duration),
         image: service.image,
         features: service.features.join(', '),
-        pricePerUnit: String((service as any).pricePerUnit || ''),
-        unitConfig: (service as any).unitConfig?._id || (service as any).unitConfig || '',
+        pricePerUnit: String(service.pricePerUnit || ''),
+        unitConfig: (typeof service.unitConfig==='object'?service.unitConfig?._id:service.unitConfig) || '',
       });
-      if ((service as any).pricePerUnit > 0 || (service as any).unitConfig) {
-        setServiceType('fixed-price');
-      }
+      setServiceType((typeof service.unitConfig==='object'&&service.unitConfig?.unitType==='square')||(!service.unitConfig&&service.pricePerSqFt>0&&service.pricePerUnit===0)?'sqft-based':'fixed-price');
     } else {
       setFormData({
         name: '',
@@ -132,8 +130,8 @@ export default function ServiceEditModal({ service, onClose, onSuccess }: Servic
           },
         });
         imageUrl = uploadRes.data.filePath;
-      } catch (err: any) {
-        const errorMsg = err.response?.data?.message || 'Image upload failed. Please try again.';
+      } catch (err: unknown) {
+        const errorMsg = (axios.isAxiosError<{message:string}>(err)?err.response?.data.message:undefined) || 'Image upload failed. Please try again.';
         setError(errorMsg);
         toast.error(errorMsg);
         setIsLoading(false);
@@ -147,22 +145,22 @@ export default function ServiceEditModal({ service, onClose, onSuccess }: Servic
       basePrice: parseFloat(formData.basePrice),
       pricePerSqFt: serviceType === 'fixed-price' ? 0 : parseFloat(formData.pricePerSqFt),
       pricePerUnit: serviceType === 'fixed-price' ? parseFloat(formData.pricePerUnit) || 0 : 0,
-      unitConfig: serviceType === 'fixed-price' ? formData.unitConfig || null : null,
-      duration: parseInt(formData.duration),
+      unitConfig: serviceType === 'fixed-price' ? (unitConfigs.find(c=>c._id===formData.unitConfig)?.unitType==='square'?null:formData.unitConfig||null) : (typeof service?.unitConfig==='object'&&service.unitConfig?.unitType==='square'?service.unitConfig._id:null),
+      duration: parseFloat(formData.duration),
       features: formData.features.split(',').map(f => f.trim()).filter(f => f),
     };
 
     try {
       if (isEditMode && service) {
-        await axios.put(`/api/services/${service.id || (service as any)._id}`, serviceData);
+        await axios.put(`/api/services/${service.id}`, serviceData);
       } else {
         await axios.post('/api/services', serviceData);
       }
       toast.success(`Service ${isEditMode ? 'updated' : 'created'} successfully!`);
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'An error occurred.');
+    } catch (err: unknown) {
+      setError((axios.isAxiosError<{message:string}>(err)?err.response?.data.message:undefined) || 'An error occurred.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -170,7 +168,7 @@ export default function ServiceEditModal({ service, onClose, onSuccess }: Servic
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">{isEditMode ? 'Edit Service' : 'Create New Service'}</h2>
@@ -237,7 +235,7 @@ export default function ServiceEditModal({ service, onClose, onSuccess }: Servic
                   className="mt-1 w-full px-3 py-2 border rounded-md"
                 >
                   <option value="">No unit config (Simple fixed price)</option>
-                  {unitConfigs.map(config => (
+                  {unitConfigs.filter(config=>config.unitType!=='square').map(config => (
                     <option key={config._id} value={config._id}>{config.label}</option>
                   ))}
                 </select>

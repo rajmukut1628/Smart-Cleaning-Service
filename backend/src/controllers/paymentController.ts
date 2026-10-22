@@ -1,3 +1,4 @@
+import {bookingEvent} from '../middleware/requestContext';
 import {Request,Response} from 'express';
 import mongoose from 'mongoose';
 import Booking from '../models/Booking';
@@ -10,7 +11,7 @@ export async function updateBookingPayment(req:Request & {user?:any},res:Respons
   if(status==='paid'&&current.status!=='completed')return res.status(400).json({message:'Complete the service before confirming cash payment'});
   if(current.paymentStatus===status)return res.json(current);
   const update=status==='paid'?{$set:{paymentStatus:status,paymentConfirmedBy:req.user._id,paymentConfirmedAt:new Date()}}:{$set:{paymentStatus:status},$unset:{paymentConfirmedBy:1,paymentConfirmedAt:1}};
-  const booking=await Booking.findOneAndUpdate({_id:id,paymentStatus:current.paymentStatus,...(status==='paid'?{status:'completed'}:{})},update,{new:true});
+  const booking=await Booking.findOneAndUpdate({_id:id,paymentStatus:current.paymentStatus,...(status==='paid'?{status:'completed'}:{})},{...update,$inc:{__v:1},$push:{timeline:bookingEvent('payment',status==='paid'?'Cash payment confirmed':'Cash confirmation reversed')}},{new:true});
   if(!booking)return res.status(409).json({message:'Booking changed. Refresh and try again.'});
   res.json(booking);
  }catch{res.status(500).json({message:'Payment could not be updated. Please try again.'});}

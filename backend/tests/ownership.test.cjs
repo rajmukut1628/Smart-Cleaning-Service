@@ -58,9 +58,9 @@ test('non-owners, wrong password, and Google-only targets cannot transfer owners
 test('the owner cannot be removed and bulk deletion skips both owner and administrator accounts', async () => mocked(async mock => {
   const req = request(state()); req.params.id = ownerId; const res = response(); await controller.removeAdministrator(req, res); assert.equal(res.code, 400);
   let deleted;
-  mock(User, 'find', async () => [{ _id: ownerId, role: 'user' }, { _id: targetId, role: 'superadmin' }, { _id: 'customer', role: 'user' }]);
+  mock(User, 'find', async () => [{ _id: ownerId, role: 'user' }, { _id: targetId, role: 'superadmin' }, { _id: '507f1f77bcf86cd799439099', role: 'user' }]);
   mock(User, 'deleteMany', async filter => { deleted = filter._id.$in; return { deletedCount: 1 }; });
-  const bulk = response(); await roles.bulkDeleteUsers({ user: { _id: 'admin' }, ownership: state(), body: { userIds: [ownerId, targetId, 'customer'] } }, bulk); assert.equal(bulk.code, 200); assert.deepEqual(deleted, ['customer']);
+  const bulk = response(); await roles.bulkDeleteUsers({ user: { _id: 'admin' }, ownership: state(), body: { userIds: [ownerId, targetId, '507f1f77bcf86cd799439099'] } }, bulk); assert.equal(bulk.code, 200); assert.deepEqual(deleted, ['507f1f77bcf86cd799439099']);
 }));
 
 test('admin removal revokes access and sessions in authority even when the display-role write fails', async () => mocked(async mock => {

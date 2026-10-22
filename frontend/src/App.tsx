@@ -1,8 +1,10 @@
+import SupportHub from './components/common/SupportHub';
 import ManagementWorkspace from './components/Admin/ManagementWorkspace';
 import { ManagementPage, AnalyticsPage, WorkerJobsPage, PerformancePage, NotFoundPage } from './components/common/OperationalPages';
 import React from 'react';
 import { scrollToSection } from './utils/scrollToSection';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import {AuthProvider} from './context/AuthContext';
+import {useAuth} from './context/authState';
 import LoginForm from './components/Auth/LoginForm';
 import ForgotPasswordForm from './components/Auth/ForgotPasswordForm';
 import RegistrationForm from './components/Auth/RegistrationForm';
@@ -79,7 +81,7 @@ function AppContent() {
           <Route path="/forgot-password" element={<ForgotPasswordForm />} />
           <Route path="/login" element={<LoginForm onSwitchPage={() => navigate('/register')} />} />
           <Route path="/register" element={<RegistrationForm onSwitchPage={() => navigate('/login')} />} />
-          {['/home', '/management', '/admin-dashboard', '/analytics', '/bookings-management', '/workers-management', '/services-management', '/user-dashboard', '/bookings', '/worker-dashboard', '/jobs', '/earnings', '/performance', '/settings', '/profile', '/chat', '/cleaning-tips'].map(path => <Route key={path} path={path} element={<Navigate to="/" replace />} />)}
+          {['/support', '/home', '/management', '/admin-dashboard', '/analytics', '/bookings-management', '/workers-management', '/services-management', '/user-dashboard', '/bookings', '/worker-dashboard', '/jobs', '/earnings', '/performance', '/settings', '/profile', '/chat', '/cleaning-tips'].map(path => <Route key={path} path={path} element={<Navigate to="/" replace />} />)}
           <Route path="*" element={<><PublicHeader /><NotFoundPage /></>} />
         </Routes>
         {location.pathname !== '/chat' && <WhatsAppButton />}
@@ -93,6 +95,7 @@ function AppContent() {
 
       <main className={location.pathname === '/chat' ? 'max-w-7xl mx-auto min-h-0 px-3 py-3 sm:px-6 lg:px-8' : ['/', '/home', '/services', '/contact', '/reviews', '/how-it-works'].includes(location.pathname) ? '' : 'workspace-page max-w-7xl mx-auto py-2 px-4 sm:px-6 lg:px-8'}>
         <Routes>
+          {user.role !== 'worker'&&<Route path="/support" element={<SupportHub/>}/>}
           {user.role !== 'worker' && <Route path="/settings" element={<AccountSettings />} />}
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/reviews" element={<ReviewsPage />} />

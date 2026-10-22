@@ -1,6 +1,6 @@
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import GoogleIdentityButton from './GoogleIdentityButton';
@@ -23,7 +23,7 @@ export default function RegistrationForm({ onSwitchPage }: RegistrationFormProps
   const [pending, setPending] = useState<{ verificationId: string; email: string } | null>(null);
   const [code, setCode] = useState('');
   const [resendWait, setResendWait] = useState(0);
-  const messageFor = (error: unknown) => axios.isAxiosError(error) ? error.response?.data?.message || 'Please try again.' : error instanceof Error ? error.message : 'Please try again.';
+  const messageFor = (error: unknown) => axios.isAxiosError(error) ? (axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Please try again.' : error instanceof Error ? error.message : 'Please try again.';
   useEffect(() => { if (resendWait <= 0) return; const timer = window.setTimeout(() => setResendWait(value => Math.max(0, value - 1)), 1000); return () => window.clearTimeout(timer); }, [resendWait]);
 
   const signUpWithGoogle = async (credential: string) => {

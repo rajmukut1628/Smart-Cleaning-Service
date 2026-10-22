@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { CreditCard, Loader2 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import './user-profile.css';
 interface Spending { totalSpent: number; totalBookings: number; monthlySpending: Record<string, number> }
 const money = (amount: number) => '৳' + new Intl.NumberFormat('en-BD', { maximumFractionDigits: 2 }).format(amount);

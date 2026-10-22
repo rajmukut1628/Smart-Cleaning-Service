@@ -3,6 +3,16 @@ import ActivityLog from '../models/ActivityLog';
 // Explicit allowlist: no chat, request bodies, credentials, or personal profile values.
 export function describeActivity(method:string,path:string) {
  const rules:[string,RegExp,string,string][]=[
+ ['POST',/^\/api\/support$/,'Support request opened','support'],
+ ['PATCH',/^\/api\/support\/[^/]+$/,'Support request updated','support'],
+ ['POST',/^\/api\/bookings\/[^/]+\/cancellation$/,'Cancellation requested','booking'],
+ ['PATCH',/^\/api\/bookings\/[^/]+\/cancellation$/,'Cancellation request decided','booking'],
+ ['POST',/^\/api\/profile\/email-change\/verify$/,'Account email verified and updated','account'],
+ ['POST',/^\/api\/operations\/backup$/,'Automated encrypted backup exported','administration'],
+ ['POST',/^\/api\/admin\/backup$/,'Encrypted database backup downloaded','administration'],
+ ['DELETE',/^\/api\/admin\/admins\/[^/]+\/account$/,'Administrator account deleted','account'],
+ ['POST',/^\/api\/bookings\/[^/]+\/reschedule$/,'Schedule change requested','booking'],
+ ['PATCH',/^\/api\/bookings\/[^/]+\/reschedule$/,'Schedule request decided','booking'],
  ['POST',/^\/api\/admin\/ownership\/transfer$/,'Platform ownership transferred','administration'],
  ['POST',/^\/api\/services\/custom$/,'Custom service created','service'],
  ['PUT',/^\/api\/services\/custom\/[^/]+$/,'Custom service updated','service'],
@@ -31,9 +41,9 @@ export function describeActivity(method:string,path:string) {
  return rule?{action:rule[2],category:rule[3]}:null;
 }
 export function platformActivity(req:Request,res:Response,next:NextFunction) {
- const event=describeActivity(req.method,req.path); if(!event)return next();
+ let event=describeActivity(req.method,req.path); if(!event)return next();
  const path=req.path; let status:string|undefined;
- const json=res.json.bind(res); res.json=((body:unknown)=>{const value=body as {status?:unknown};if(value&&typeof value.status==='string'&&['pending','confirmed','in-progress','completed','cancelled'].includes(value.status))status=value.status;return json(body);}) as typeof res.json;
+ const json=res.json.bind(res); res.json=((body:unknown)=>{const value=body as {status?:unknown;paymentStatus?:unknown};if(path.endsWith('/payment')&&value?.paymentStatus==='pending')event={action:'Cash confirmation reversed',category:'payment'};if(value&&typeof value.status==='string'&&['pending','confirmed','in-progress','completed','cancelled'].includes(value.status))status=value.status;return json(body);}) as typeof res.json;
  res.on('finish',()=>{const actor=(req as Request & {user?:{_id:unknown;name?:string;role?:string}}).user;if(res.statusCode>=400||!actor)return;
  const entityId=path.split('/').find(part=>/^[a-f0-9]{24}$/i.test(part));
  ActivityLog.create({...event,actorId:actor._id,actorName:actor.name,actorRole:actor.role,entityId,status}).catch(()=>console.error('Activity recording failed'));

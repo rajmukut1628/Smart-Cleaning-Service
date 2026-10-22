@@ -7,23 +7,11 @@ import { getReviewGallery } from './reviewGalleryController';
 // Create a review
 export const createReview = async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log('=== Create Review Request ===');
-    console.log('Body:', req.body);
-    console.log('User:', (req as any).user);
-
     const { bookingId, rating, comment, professionalism, punctuality, quality } = req.body;
     const userId = (req as any).user.id;
-
-    console.log('Booking ID:', bookingId);
-    console.log('User ID:', userId);
-
     // Check if booking exists and belongs to user
     const booking = await Booking.findById(bookingId);
-    console.log('Booking found:', booking ? 'Yes' : 'No');
-
-    if (!booking) {
-      console.log('Error: Booking not found');
-      res.status(404).json({ message: 'Booking not found' });
+    if (!booking) {      res.status(404).json({ message: 'Booking not found' });
       return;
     }
 
@@ -65,8 +53,8 @@ export const createReview = async (req: Request, res: Response): Promise<void> =
     await booking.save();
 
     const populatedReview = await Review.findById(review._id)
-      .populate('user', 'name email')
-      .populate('worker', 'name email')
+      .populate('user', 'name profilePicture')
+      .populate('worker', 'name')
       .populate('service', 'name');
 
     res.status(201).json(populatedReview);
@@ -86,7 +74,7 @@ export const getWorkerReviews = async (req: Request, res: Response): Promise<voi
     const { workerId } = req.params;
 
     const reviews = await Review.find({ worker: workerId })
-      .populate('user', 'name email')
+      .populate('user', 'name profilePicture')
       .populate('service', 'name')
       .sort({ createdAt: -1 });
 
@@ -128,9 +116,11 @@ export const getBookingReview = async (req: Request, res: Response): Promise<voi
   try {
     const { bookingId } = req.params;
 
+    const booking=await Booking.findById(bookingId);const actor=(req as any).user;
+    if(!booking||(!['admin','superadmin'].includes(actor.role)&&String(booking.user)!==String(actor._id)&&![booking.worker,...booking.workers].filter(Boolean).some(id=>String(id)===String(actor._id)))){res.status(404).json({message:'Review not found'});return;}
     const review = await Review.findOne({ booking: bookingId })
-      .populate('user', 'name email')
-      .populate('worker', 'name email')
+      .populate('user', 'name profilePicture')
+      .populate('worker', 'name')
       .populate('service', 'name');
 
     if (!review) {
@@ -151,7 +141,7 @@ export const getUserReviews = async (req: Request, res: Response): Promise<void>
     const userId = (req as any).user.id;
 
     const reviews = await Review.find({ user: userId })
-      .populate('worker', 'name email')
+      .populate('worker', 'name')
       .populate('service', 'name')
       .populate('booking')
       .sort({ createdAt: -1 });
@@ -190,8 +180,8 @@ export const updateReview = async (req: Request, res: Response): Promise<void> =
     await review.save();
 
     const updatedReview = await Review.findById(reviewId)
-      .populate('user', 'name email')
-      .populate('worker', 'name email')
+      .populate('user', 'name profilePicture')
+      .populate('worker', 'name')
       .populate('service', 'name');
 
     res.json(updatedReview);

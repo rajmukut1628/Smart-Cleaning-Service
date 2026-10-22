@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MapPinIcon, ArrowUpRightIcon, StarIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { scrollToSection } from '../../utils/scrollToSection';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import { Job, useWorkerData } from './workerData';
 import { DataState, RefreshButton, WorkerHeading } from './WorkerUI';
 import WorkerJobDetails, { JobCard } from './WorkerJobDetails';

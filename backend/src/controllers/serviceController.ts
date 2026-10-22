@@ -52,12 +52,12 @@ export const updateService = async (req: Request, res: Response) => {
       service.name = name || service.name;
       service.category = category || service.category;
       service.description = description || service.description;
-      service.basePrice = basePrice || service.basePrice;
+      service.basePrice = basePrice !== undefined ? basePrice : service.basePrice;
       service.pricePerSqFt = pricePerSqFt !== undefined ? pricePerSqFt : service.pricePerSqFt;
       service.pricePerUnit = pricePerUnit !== undefined ? pricePerUnit : service.pricePerUnit;
-      service.unitConfig = unitConfig || service.unitConfig;
+      service.unitConfig = unitConfig === null || unitConfig === '' ? undefined : unitConfig !== undefined ? unitConfig : service.unitConfig;
       service.duration = duration || service.duration;
-      service.image = image || service.image;
+      service.image = image !== undefined ? image : service.image;
       service.features = features || service.features;
 
       const updatedService = await service.save();
@@ -96,8 +96,8 @@ export const deleteService = async (req: Request, res: Response) => {
 // @access  Public (for development purposes)
 export const seedServices = async (req: Request, res: Response) => {
   try {
-    // Clear existing services
-    await Service.deleteMany({});
+    if(process.env.NODE_ENV==='production'||process.env.RENDER)return res.status(403).json({message:'Seeding is disabled in production'});
+    if(await Service.exists({}))return res.status(409).json({message:'Services already exist. Seeding never replaces a catalog.'});
 
     // Insert the seed data
     const createdServices = await Service.insertMany(seedServicesData);

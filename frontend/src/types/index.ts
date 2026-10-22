@@ -18,7 +18,7 @@ export interface Service {
   basePrice: number;
   pricePerSqFt: number;
   pricePerUnit: number;
-  unitConfig?: any; // Add any for now, or define UnitConfig type
+  unitConfig?: string|{_id:string;unitType:string;label:string;options?:{label:string;value:number}[];allowCustom?:boolean;customPlaceholder?:string}|null;
   duration: number;
   image: string;
   features: string[];

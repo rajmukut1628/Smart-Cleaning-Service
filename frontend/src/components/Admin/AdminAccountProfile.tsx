@@ -1,8 +1,9 @@
+import VerifiedEmailChange from '../common/VerifiedEmailChange';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Camera, Check, Mail, MapPin, Pencil, Phone, ShieldCheck, UserRound, X } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import { API_BASE_URL } from '../../config/apiConfig';
 
 interface AdminAccount {
@@ -17,7 +18,7 @@ interface AdminAccount {
 }
 type ProfileForm = Pick<AdminAccount, 'name' | 'email'> & { phone: string; address: string };
 const formFor = (account: AdminAccount): ProfileForm => ({ name: account.name, email: account.email, phone: account.phone || '', address: account.address || '' });
-const messageFor = (error: unknown, fallback: string) => axios.isAxiosError<{message?: string}>(error) ? error.response?.data?.message || fallback : fallback;
+const messageFor = (error: unknown, fallback: string) => axios.isAxiosError<{message?: string}>(error) ? (axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || fallback : fallback;
 const pictureUrl = (path?: string) => !path ? '' : path.startsWith('/') ? API_BASE_URL + path : path;
 
 export default function AdminAccountProfile() {
@@ -48,7 +49,7 @@ export default function AdminAccountProfile() {
     if (!form.name.trim() || !form.phone.trim()) { toast.error('Name and phone number are required'); return; }
     setSaving(true);
     try {
-      const { data } = await axios.put<{user: AdminAccount}>('/api/profile', { name: form.name.trim(), email: form.email.trim().toLowerCase(), phone: form.phone.trim(), address: form.address.trim() });
+      const { data } = await axios.put<{user: AdminAccount}>('/api/profile', { name: form.name.trim(), phone: form.phone.trim(), address: form.address.trim() });
       syncAccount(data.user); setEditing(false); toast.success('Profile updated');
     } catch (error) { toast.error(messageFor(error, 'Could not update profile')); }
     finally { setSaving(false); }
@@ -84,7 +85,8 @@ export default function AdminAccountProfile() {
       </div></aside>
       <div className="space-y-5">
         <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-4"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-bold text-slate-900">Personal information</h2><p className="mt-1 text-xs text-slate-400">Keep your contact details accurate.</p></div>{!editing && <button disabled={uploading} onClick={() => { setForm(formFor(account)); setEditing(true); }} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"><Pencil size={13} />Edit profile</button>}</div>
-          {editing ? <form onSubmit={save}><div className="grid gap-4 sm:grid-cols-2">{fields.map(field => <label key={field.key} className="text-xs font-medium text-slate-600">{field.label}{!field.required && <span className="ml-1 font-normal text-slate-400">(optional)</span>}<input required={field.required} type={field.type} autoComplete={field.autoComplete} maxLength={field.key === 'address' ? 300 : 150} value={form[field.key]} onChange={event => setForm({ ...form, [field.key]: event.target.value })} disabled={saving} className="mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm text-slate-800" /></label>)}</div><div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={saving} onClick={() => { setForm(formFor(account)); setEditing(false); }} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100"><X size={13} />Cancel</button><button disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"><Check size={14} />{saving ? 'Saving…' : 'Save changes'}</button></div></form> : <dl className="grid gap-x-4 gap-y-5 sm:grid-cols-2">{fields.filter(field => Boolean(account[field.key])).map(field => <div key={field.key}><dt className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-400"><field.icon size={13} />{field.label}</dt><dd className="break-words text-sm font-medium text-slate-700">{account[field.key]}</dd></div>)}{!account.address && <div><dt className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-400"><MapPin size={13} />Address</dt><dd><button disabled={uploading} onClick={() => setEditing(true)} className="text-xs font-medium text-blue-600 hover:underline">Add address</button></dd></div>}</dl>}
+          {editing ? <form onSubmit={save}><div className="grid gap-4 sm:grid-cols-2">{fields.map(field => <label key={field.key} className="text-xs font-medium text-slate-600">{field.label}{!field.required && <span className="ml-1 font-normal text-slate-400">(optional)</span>}<input required={field.required} type={field.type} autoComplete={field.autoComplete} maxLength={field.key === 'address' ? 300 : 150} value={form[field.key]} onChange={event => setForm({ ...form, [field.key]: event.target.value })} disabled={saving||field.key==='email'} className="mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm text-slate-800" /></label>)}</div><div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={saving} onClick={() => { setForm(formFor(account)); setEditing(false); }} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100"><X size={13} />Cancel</button><button disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"><Check size={14} />{saving ? 'Saving…' : 'Save changes'}</button></div></form> : <dl className="grid gap-x-4 gap-y-5 sm:grid-cols-2">{fields.filter(field => Boolean(account[field.key])).map(field => <div key={field.key}><dt className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-400"><field.icon size={13} />{field.label}</dt><dd className="break-words text-sm font-medium text-slate-700">{account[field.key]}</dd></div>)}{!account.address && <div><dt className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-400"><MapPin size={13} />Address</dt><dd><button disabled={uploading} onClick={() => setEditing(true)} className="text-xs font-medium text-blue-600 hover:underline">Add address</button></dd></div>}</dl>}
+        <VerifiedEmailChange/>
         </section>
       </div>
     </div>

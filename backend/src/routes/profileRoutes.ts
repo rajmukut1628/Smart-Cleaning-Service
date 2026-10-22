@@ -1,3 +1,5 @@
+import {requestEmailChange,verifyEmailChange} from '../controllers/emailChangeController';
+import {limitRegistrationEmails} from '../middleware/registrationRateLimit';
 import express from 'express';
 import {
   getProfile,
@@ -21,4 +23,6 @@ router.put('/picture', upload.single('profilePicture'), updateProfilePicture);
 router.put('/password', changePassword);
 router.get('/spending-analytics', getUserSpendingAnalytics);
 
+router.post('/email-change',limitRegistrationEmails,requestEmailChange);
+router.post('/email-change/verify',verifyEmailChange);
 export default router;

@@ -49,7 +49,7 @@ export default function AdminManagement() {
   const fetchAdmins = async () => {
     try {
       const response = await axios.get('/api/admin/admins');
-      const adminsData = response.data.map((admin: any) => ({
+      const adminsData = response.data.map((admin: User & {_id:string}) => ({
         ...admin,
         id: admin._id,
       }));
@@ -112,9 +112,9 @@ export default function AdminManagement() {
       setShowModal(false);
       notifyManagementUpdated();
       fetchAdmins();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving admin:', error);
-      toast.error(error.response?.data?.message || 'Failed to save admin');
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to save admin');
     }
   };
 
@@ -210,7 +210,7 @@ export default function AdminManagement() {
       {removal && <OwnershipAction mode="remove" target={{ _id: removal.id, name: removal.name, email: removal.email }} onClose={() => setRemoval(null)} onDone={() => { setRemoval(null); fetchAdmins(); notifyManagementUpdated(); toast.success('Administrator access removed'); }} />}
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">

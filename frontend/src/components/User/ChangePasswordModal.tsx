@@ -1,3 +1,4 @@
+import {useAuth} from '../../context/authState';
 import React, { useState } from 'react';
 import axios from 'axios';
 import { XMarkIcon } from '@heroicons/react/24/outline';
@@ -8,6 +9,7 @@ interface ChangePasswordModalProps {
 }
 
 export default function ChangePasswordModal({ onClose }: ChangePasswordModalProps) {
+  const {logout}=useAuth();
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -41,15 +43,16 @@ export default function ChangePasswordModal({ onClose }: ChangePasswordModalProp
       });
       toast.success('Password changed successfully!');
       onClose();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to change password');
+      logout();
+    } catch (error: unknown) {
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to change password');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl max-w-md w-full">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Change Password</h2>

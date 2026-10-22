@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { imageUrl } from '../../utils/imageUrl';
 import { useState } from 'react';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
@@ -96,16 +97,16 @@ export default function ImageUpload({
       toast.success(`${type === 'before' ? 'Before' : 'After'} images uploaded successfully!`);
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upload error:', error);
-      toast.error(error.response?.data?.message || 'Failed to upload images');
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to upload images');
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">

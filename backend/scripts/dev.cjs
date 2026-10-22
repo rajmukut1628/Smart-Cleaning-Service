@@ -10,14 +10,14 @@ function devEnvironment(base = process.env, platform = process.platform) {
   const system32 = path.win32.join((rootKey && env[rootKey]) || 'C:\\Windows', 'System32');
   const entries = String(env[pathKey] || '').split(';').filter(entry => entry && entry.toLowerCase() !== system32.toLowerCase());
   for (const key of pathKeys) delete env[key];
-  // nodemon uses taskkill on Windows. Some terminal environments omit System32.
+  // Keep standard Windows tools available to development child processes.
   env[pathKey] = [system32, ...entries].join(';');
   return env;
 }
 
 if (require.main === module) {
   const backend = path.resolve(__dirname, '..');
-  const child = spawn(process.execPath, [require.resolve('nodemon/bin/nodemon.js'), '--cwd', backend, 'src/server.ts', ...process.argv.slice(2)], {
+  const child = spawn(process.execPath, ['--watch', '--require', 'ts-node/register', 'src/server.ts', ...process.argv.slice(2)], {
     cwd: backend, stdio: 'inherit', env: devEnvironment(),
   });
   child.on('error', error => { console.error('Could not start development server:', error.message); process.exitCode = 1; });

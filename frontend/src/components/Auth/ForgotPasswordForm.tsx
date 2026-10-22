@@ -15,7 +15,7 @@ export default function ForgotPasswordForm() {
   const [error, setError] = useState('');
   const [wait, setWait] = useState(0);
   const [done, setDone] = useState(false);
-  const message = (err: unknown) => axios.isAxiosError(err) ? err.response?.data?.message || 'Unable to connect. Please try again.' : 'Please try again.';
+  const message = (err: unknown) => axios.isAxiosError(err) ? (axios.isAxiosError<{message:string}>(err)?err.response?.data.message:undefined) || 'Unable to connect. Please try again.' : 'Please try again.';
   useEffect(() => { if (!wait) return; const timer = window.setTimeout(() => setWait(value => Math.max(0, value - 1)), 1000);return () => window.clearTimeout(timer); }, [wait]);
   const requestCode = async (event?: React.FormEvent) => {
     event?.preventDefault();if (busy) return;setBusy(true);setError('');

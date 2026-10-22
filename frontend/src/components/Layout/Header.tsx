@@ -1,7 +1,7 @@
 import ActivityNotifications from '../Admin/ActivityNotifications';
 import AccountNotifications from '../common/AccountNotifications';
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import { NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import io, { Socket } from 'socket.io-client';
@@ -53,7 +53,7 @@ export default function Header() {
       try {
         const response = await axios.get('/api/chat/unread-count');
         setUnreadCount(response.data.unreadCount);
-      } catch (error) {
+      } catch {
         // Silently fail if backend is not available
       }
     };
@@ -75,7 +75,7 @@ export default function Header() {
     socket.on('session-revoked', () => logout());
 
     // Listen for new messages to increment unread count
-    socket.on('chatMessage', (message: any) => {
+    socket.on('chatMessage', (message: {receiverId:string;isRead:boolean}) => {
       if (message.receiverId === user.id && !message.isRead) {
         setUnreadCount(prev => prev + 1);
       }
@@ -86,7 +86,7 @@ export default function Header() {
       try {
         const response = await axios.get('/api/chat/unread-count');
         setUnreadCount(response.data.unreadCount);
-      } catch (error) {
+      } catch {
         // Silently fail
       }
     };
@@ -101,7 +101,7 @@ export default function Header() {
       socket?.disconnect();
       window.removeEventListener('chat-read', handleChatRead);
     };
-  }, [user]);
+  }, [user,logout]);
 
   const getNavItems = () => {
     if (!user) return [];

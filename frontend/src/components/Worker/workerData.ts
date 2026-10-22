@@ -9,7 +9,7 @@ export interface Job {
 }
 export interface WorkerAccount {
   name: string; email: string; phone?: string; address?: string; bio?: string;
-  skills?: string[]; experience?: number; isVerified?: boolean; profilePicture?: string;
+  skills?: string[]; experience?: number; profilePicture?: string;
   availability?: Record<string, { start: string; end: string }>;
 }
 export interface EarningRow { id: string; amount: number; teamSize: number; date: string; estimatedDate: boolean; paymentStatus: string }

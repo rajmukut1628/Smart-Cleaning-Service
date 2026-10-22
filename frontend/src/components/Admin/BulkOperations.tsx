@@ -1,3 +1,4 @@
+import type {BookingRecord} from '../../types/booking';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Booking, User } from '../../types';
@@ -22,7 +23,7 @@ export default function BulkOperations() {
   const fetchBookings = async () => {
     try {
       const response = await axios.get('/api/admin/bookings');
-      const mappedBookings = response.data.map((b: any) => ({
+      const mappedBookings = response.data.map((b: BookingRecord) => ({
         ...b,
         id: b._id,
         customerName: b.user?.name || 'Unknown',
@@ -40,7 +41,7 @@ export default function BulkOperations() {
   const fetchUsers = async () => {
     try {
       const response = await axios.get('/api/admin/users');
-      const mappedUsers = response.data.map((u: any) => ({
+      const mappedUsers = response.data.map((u: User & {_id:string}) => ({
         ...u,
         id: u._id,
       }));
@@ -105,9 +106,9 @@ export default function BulkOperations() {
       toast.success(`Updated ${selectedBookings.length} bookings to ${status}`);
       setSelectedBookings([]);
       fetchBookings();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating bookings:', error);
-      toast.error(error.response?.data?.message || 'Failed to update bookings');
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to update bookings');
     } finally {
       setIsLoading(false);
     }
@@ -127,9 +128,9 @@ export default function BulkOperations() {
       toast.success(`Cancelled ${selectedBookings.length} bookings`);
       setSelectedBookings([]);
       fetchBookings();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error cancelling bookings:', error);
-      toast.error(error.response?.data?.message || 'Failed to cancel bookings');
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to cancel bookings');
     } finally {
       setIsLoading(false);
     }
@@ -151,9 +152,9 @@ export default function BulkOperations() {
       toast.success(response.data.message);
       setSelectedUsers([]);
       fetchUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting users:', error);
-      toast.error(error.response?.data?.message || 'Failed to delete users');
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to delete users');
     } finally {
       setIsLoading(false);
     }
@@ -174,9 +175,9 @@ export default function BulkOperations() {
       toast.success(response.data.message);
       setSelectedUsers([]);
       fetchUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error blocking users:', error);
-      toast.error(error.response?.data?.message || 'Failed to block users');
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to block users');
     } finally {
       setIsLoading(false);
     }

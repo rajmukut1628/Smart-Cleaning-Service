@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   googleSubject: { type: String, unique: true, sparse: true },
   emailVerifiedAt: { type: Date },
   sessionVersion: { type: Number, default: 0, select: true },
+  blockedFromRole: {type:String,enum:['user','worker']},
   role: { type: String, enum: ['user', 'worker', 'admin', 'superadmin', 'blocked'], default: 'user' },
   phone: { type: String, required: function (this: any) { return this.authProvider !== 'google'; }, default: '' },
   address: { type: String },
@@ -47,6 +48,8 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true,
 });
+
+userSchema.pre('validate', function () { if(this.role === 'worker') this.isVerified = true; });
 
 const User = mongoose.model('User', userSchema);
 

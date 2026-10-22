@@ -10,7 +10,7 @@ export async function createManagedAccount(req: Request, res: Response) {
   if (!name || !phone || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || typeof password !== 'string' || password.length < 8 || !['user','worker'].includes(role)) return res.status(400).json({ message: 'Provide name, valid email, phone, an 8-character password and a User or Worker role' });
   try {
     if (await User.findOne({ email })) return res.status(409).json({ message: 'An account already exists with this email' });
-    const account = await User.create({ name, email, phone, role, password: await bcrypt.hash(password, 12) });
+    const account = await User.create({ name, email, phone, role, isVerified: role === 'worker', password: await bcrypt.hash(password, 12) });
     return res.status(201).json({ _id: account._id, name: account.name, email: account.email, phone: account.phone, role: account.role, createdAt: account.createdAt });
   } catch (error) {
     if ((error as {code?: number}).code === 11000) return res.status(409).json({ message: 'An account already exists with this email' });

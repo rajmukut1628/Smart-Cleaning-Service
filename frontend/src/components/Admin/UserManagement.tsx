@@ -3,12 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Plus, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import { notifyManagementUpdated } from './managementEvents';
 
 interface ManagedUser { _id: string; name: string; email: string; phone?: string; role: string; createdAt: string }
 const roleLabels: Record<string,string> = {user:'Customer',worker:'Worker',admin:'Admin',superadmin:'Platform Owner',blocked:'Blocked'};
-const errorMessage = (error: unknown, fallback: string) => axios.isAxiosError<{message?:string}>(error) ? error.response?.data?.message || fallback : fallback;
+const errorMessage = (error: unknown, fallback: string) => axios.isAxiosError<{message?:string}>(error) ? (axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || fallback : fallback;
 
 function CreateAccount({ onClose, onCreated }: { onClose:()=>void; onCreated:()=>void }) {
   const dialog = useRef<HTMLDialogElement>(null);

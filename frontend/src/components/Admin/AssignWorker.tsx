@@ -1,3 +1,4 @@
+import type {BookingRecord} from '../../types/booking';
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
@@ -8,7 +9,7 @@ interface AssignWorkerProps {
   workers: { _id: string; name: string; }[];
   scheduledDate: string;
   scheduledTime: string;
-  allBookings: any[];
+  allBookings: BookingRecord[];
   onAssignmentSuccess: () => void;
   initialSelectedWorkers?: string[];
 }
@@ -28,9 +29,7 @@ export default function AssignWorker({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Sync state with props when bookings are refreshed
-  useEffect(() => {
-    setSelectedWorkers(initialSelectedWorkers);
-  }, [JSON.stringify(initialSelectedWorkers)]);
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -46,20 +45,13 @@ export default function AssignWorker({
     return allBookings.some(booking => {
       if (!booking.worker && (!booking.workers || booking.workers.length === 0)) return false;
       
-      const assignedWorkerIds = booking.workers?.map((w: any) => typeof w === 'object' ? w._id : w) || [];
+      const assignedWorkerIds = booking.workers?.map((w) => typeof w === 'object' ? w._id : w) || [];
       if (booking.worker) assignedWorkerIds.push(typeof booking.worker === 'object' ? booking.worker._id : booking.worker);
 
-      // Compare only YYYY-MM-DD to avoid time mismatch issues
-      const bDate = new Date(booking.scheduledDate).toISOString().split('T')[0];
-      const sDate = new Date(scheduledDate).toISOString().split('T')[0];
-
-      return (
-        booking._id !== bookingId &&
-        assignedWorkerIds.includes(workerId) &&
-        bDate === sDate &&
-        booking.scheduledTime === scheduledTime &&
-        !['cancelled', 'completed'].includes(booking.status)
-      );
+      const start=(date:string,time:string)=>Date.parse(new Date(date).toISOString().slice(0,10)+'T'+time+':00+06:00');
+      const requested=allBookings.find(row=>row._id===bookingId);
+      const requestedStart=start(scheduledDate,scheduledTime),otherStart=start(booking.scheduledDate,booking.scheduledTime);
+      return booking._id!==bookingId&&assignedWorkerIds.includes(workerId)&&!['cancelled','completed'].includes(booking.status)&&requestedStart<otherStart+(booking.service?.duration||2)*3600000&&otherStart<requestedStart+(requested?.service?.duration||2)*3600000;
     });
   };
 
@@ -82,10 +74,8 @@ export default function AssignWorker({
     const busyWorkers = selectedWorkers.filter(id => isWorkerBusy(id));
     if (busyWorkers.length > 0) {
       const busyNames = workers.filter(w => busyWorkers.includes(w._id)).map(w => w.name).join(', ');
-      const confirmAssign = window.confirm(
-        `The following workers are busy: ${busyNames}. Assign anyway?`
-      );
-      if (!confirmAssign) return;
+      toast.error('Schedule conflict: '+busyNames+'. Choose another worker or time.');
+      return;
     }
 
     setIsAssigning(true);
@@ -96,9 +86,9 @@ export default function AssignWorker({
       toast.success('Workers assigned successfully!');
       onAssignmentSuccess();
       setIsOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to assign workers', error);
-      toast.error(error.response?.data?.message || 'Failed to assign workers.');
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to assign workers.');
     } finally {
       setIsAssigning(false);
     }
@@ -178,7 +168,7 @@ export default function AssignWorker({
         disabled={isAssigning || selectedWorkers.length === 0}
         className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-extrabold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 active:scale-[0.97]"
       >
-        {isAssigning ? '...' : 'Assign'}
+        {isAssigning ? 'Saving…' : initialSelectedWorkers.length ? 'Save team' : 'Assign worker'}
       </button>
     </div>
   );

@@ -45,9 +45,8 @@ export default function UnitManagement() {
     try {
       const response = await axios.get('/api/unit-configs');
       setUnitConfigs(response.data);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load unit configurations');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -58,8 +57,8 @@ export default function UnitManagement() {
       await axios.post('/api/unit-configs/seed');
       toast.success('Default configurations created successfully!');
       fetchUnitConfigs();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to seed configurations');
+    } catch (error: unknown) {
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to seed configurations');
     }
   };
 
@@ -96,8 +95,8 @@ export default function UnitManagement() {
       setEditingConfig(null);
       resetForm();
       fetchUnitConfigs();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save configuration');
+    } catch (error: unknown) {
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to save configuration');
     }
   };
 
@@ -122,7 +121,7 @@ export default function UnitManagement() {
       await axios.delete(`/api/unit-configs/${id}`);
       toast.success('Unit configuration deleted successfully!');
       fetchUnitConfigs();
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete configuration');
     }
   };
@@ -239,7 +238,7 @@ export default function UnitManagement() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4">
               <h3 className="text-xl font-semibold mb-4">

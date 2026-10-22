@@ -171,7 +171,7 @@ export const changeWorkerPassword = async (req: AuthenticatedRequest, res: Respo
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: 'Current password and new password are required' });
     }
-    if (typeof newPassword !== 'string' || newPassword.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || Buffer.byteLength(newPassword)>72) return res.status(400).json({ message: 'Password must be at least 8 characters' });
 
     const worker = await User.findById(req.user._id);
     if (!worker) {
@@ -193,9 +193,12 @@ export const changeWorkerPassword = async (req: AuthenticatedRequest, res: Respo
     // Hash new password
     const salt = await bcrypt.genSalt(10);
     worker.password = await bcrypt.hash(newPassword, salt);
+    worker.sessionVersion=(worker.sessionVersion||0)+1;
     await worker.save();
 
-    res.json({ message: 'Password updated successfully' });
+    req.app?.get('io')?.to('user:'+worker._id).emit('session-revoked');
+    req.app?.get('io')?.in('user:'+worker._id).disconnectSockets(true);
+    res.json({ message: 'Password updated. Please sign in again.',reauthenticate:true });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });

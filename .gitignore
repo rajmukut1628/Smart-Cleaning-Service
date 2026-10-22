@@ -9,3 +9,8 @@
 .codex/
 .agents/
 .aws/
+
+/backup-output/
+*.scsbackup
+
+.monitor-state.json

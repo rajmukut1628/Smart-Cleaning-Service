@@ -1,3 +1,5 @@
+import {checkIntegrations} from '../controllers/integrationController';
+import {downloadBackup,operationStatus} from '../controllers/operationsController';
 import { getAnalytics } from '../controllers/analyticsController';
 import { getPlatformActivity } from '../controllers/platformActivityController';
 import { updateBookingPayment } from '../controllers/paymentController';
@@ -43,7 +45,7 @@ router.route('/bookings').get(getAllBookings).post(createBookingByAdmin);
 router.route('/users').get(getAllUsers).post(createManagedAccount);
 router.route('/workers').get(getAllWorkers);
 router.route('/users/:id/role').put(superAdmin, updateUserRole);
-router.route('/users/:id').delete(deleteUser);
+
 router.route('/bookings/:id/assign').put(assignWorkerToBooking);
 
 // Admin management routes
@@ -55,6 +57,7 @@ router.route('/admins/:id').put(superAdmin, updateAdmin).delete(superAdmin, dele
 router.route('/bookings/bulk-update').put(bulkUpdateBookings);
 router.route('/bookings/bulk-cancel').put(bulkCancelBookings);
 router.route('/users/bulk-delete').delete(bulkDeleteUsers);
+router.route('/users/:id').delete(deleteUser);
 router.route('/users/bulk-block').put(bulkBlockUsers);
 
 // Admin profile routes
@@ -65,4 +68,7 @@ router.route('/export/:type').get(exportData);
 // Worker verification route
 router.route('/workers/:id/verify').put(verifyWorker);
 
+router.post('/backup',superAdmin,downloadBackup);
+router.get('/operations',superAdmin,operationStatus);
+router.post('/integrations/check',superAdmin,checkIntegrations);
 export default router;

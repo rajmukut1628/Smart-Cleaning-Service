@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import type {FormEvent} from 'react';
 import {ArrowLeft,Check,CheckCheck,Loader2,MessageCircle,Pencil,Search,Send,ShieldCheck,Trash2,Undo2,X} from 'lucide-react';
-import {useAuth} from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import api from '../../utils/axios';
 import axios from 'axios';
 import {io} from 'socket.io-client';

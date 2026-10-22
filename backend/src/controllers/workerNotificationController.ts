@@ -18,7 +18,8 @@ export function buildWorkerNotifications(bookings: any[], reviews: any[]): Item[
     const service = job.service?.name || 'Cleaning service';
     const titles: Record<string, string> = { pending: 'Assignment awaiting confirmation', confirmed: 'Job assigned to you', 'in-progress': 'Job in progress', completed: 'Job completed', cancelled: 'Job cancelled' };
     items.push({ id: identifier('job', bookingId, job.status, day, job.scheduledTime, job.address, (job.workers || []).map(String).sort()), type: 'job', title: titles[job.status] || 'Assignment updated', message: `${service} · ${day} at ${job.scheduledTime}. ${job.address || 'Open the assignment for details.'}`, createdAt: new Date(job.updatedAt || job.createdAt).toISOString(), href: `/jobs?booking=${bookingId}`, bookingId, read: false });
-    if (job.status === 'completed' && job.paymentStatus === 'paid') items.push({ id: identifier('cash', bookingId, job.paymentConfirmedAt || 'confirmed'), type: 'payment', title: 'Customer cash payment confirmed', message: `Cash payment for ${service} has been confirmed. See your allocated job value in Earnings; this is not a worker payout confirmation.`, createdAt: new Date(job.paymentConfirmedAt || job.updatedAt).toISOString(), href: '/earnings', bookingId, read: false });
+    if(job.reschedule?.status==='approved')items.push({id:identifier('rescheduled',bookingId,job.reschedule.id),type:'job',title:'Job schedule changed',message:service+' · '+day+' at '+job.scheduledTime,createdAt:new Date(job.reschedule.decidedAt).toISOString(),href:'/jobs?booking='+bookingId,bookingId,read:false});
+    if (job.status === 'completed' && job.paymentStatus === 'paid') items.push({ id: identifier('cash', bookingId, job.paymentConfirmedAt || 'confirmed'), type: 'payment', title: 'Customer cash payment confirmed', message: `Cash payment for ${service} has been confirmed. See your allocated job value in Earnings; this is not a worker payout confirmation.`, createdAt: new Date(job.paymentConfirmedAt || job.updatedAt).toISOString(), href: '/jobs?booking='+bookingId, bookingId, read: false });
   }
   for (const review of reviews) items.push({ id: identifier('review', String(review._id), review.rating), type: 'review', title: 'New customer review', message: `A customer rated your ${review.service?.name || 'cleaning service'} ${review.rating}/5. View the feedback on your dashboard.`, createdAt: new Date(review.createdAt).toISOString(), href: '/worker-dashboard#worker-feedback', read: false });
   return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
@@ -26,7 +27,7 @@ export function buildWorkerNotifications(bookings: any[], reviews: any[]): Item[
 
 async function currentInbox(workerId: unknown) {
   const jobs = await Booking.find({ $or: [{ worker: workerId }, { workers: workerId }] })
-    .select('_id service status scheduledDate scheduledTime address workers paymentStatus paymentConfirmedAt createdAt updatedAt')
+    .select('_id service status scheduledDate scheduledTime address workers paymentStatus paymentConfirmedAt createdAt updatedAt reschedule')
     .populate('service', 'name').sort({ updatedAt: -1 }).limit(50).lean();
   // Reviews on a team assignment belong to every worker currently assigned to that booking.
   const reviewJobs = jobs.map(job => job._id);

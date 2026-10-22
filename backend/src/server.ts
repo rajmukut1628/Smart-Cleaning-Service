@@ -1,3 +1,10 @@
+import mongoose from 'mongoose';
+import {automationBackupAccess} from './middleware/automationAccess';
+import {downloadBackup} from './controllers/operationsController';
+import supportRoutes from './routes/supportRoutes';
+import {monitorRequests,reportClientError} from './middleware/operations';
+import {protect} from './middleware/authMiddleware';
+import {withRequestContext} from './middleware/requestContext';
 import { authenticateSocket } from './realtime';
 import { getAllowedOrigins } from './config/origins';
 import { platformActivity } from './middleware/platformActivity';
@@ -46,7 +53,12 @@ app.get('/', (req, res) => {
   res.send('API is running...');
 });
 
+app.use(withRequestContext);
+app.use(monitorRequests);
+app.post('/api/client-errors',protect,reportClientError);
 app.use(platformActivity);
+app.get('/health',(_req,res)=>res.status(mongoose.connection.readyState===1?200:503).json({status:mongoose.connection.readyState===1?'ok':'unavailable'}));
+app.post('/api/operations/backup',automationBackupAccess,downloadBackup);
 app.use('/api/auth', authRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/services/custom', customServiceRoutes);
@@ -58,6 +70,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/unit-configs', unitConfigRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/support',supportRoutes);
 
 // Serve uploaded files statically
 // In development (ts-node): __dirname = 'backend/src', uploads = 'backend/uploads'

@@ -1,3 +1,6 @@
+import {bulkTransition} from '../services/bookingTransitions';
+import {validFutureSchedule,bookingSnapshots} from '../services/bookingRules';
+import {scheduleLock,assertScheduleFree} from '../services/scheduling';
 import { effectiveRole } from '../security/ownership';
 import { removeAdministrator } from './ownershipController';
 import ActivityLog from '../models/ActivityLog';
@@ -71,6 +74,7 @@ export const assignWorkerToBooking = async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Please provide an array of worker IDs' });
   }
 
+  let release:(()=>Promise<void>)|undefined;
   try {
     const booking = await Booking.findById(bookingId);
 
@@ -78,6 +82,8 @@ export const assignWorkerToBooking = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Booking not found' });
     }
 
+    if(['completed','cancelled'].includes(booking.status))return res.status(409).json({message:'Finished bookings cannot be reassigned'});
+    if(new Set(workerIds).size!==workerIds.length||workerIds.length>50)return res.status(400).json({message:'Choose distinct workers'});
     // Verify all workers exist and have the correct role
     const workers = await User.find({ _id: { $in: workerIds }, role: 'worker' });
     if (workers.length !== workerIds.length) {
@@ -96,17 +102,21 @@ export const assignWorkerToBooking = async (req: Request, res: Response) => {
     if (candidates.some((other: any) => { const otherStart = startOf(other); const otherEnd = otherStart + (other.service?.duration || 2) * 3600000; return start < otherEnd && otherStart < end; })) return res.status(409).json({message:'An assigned worker has an overlapping job. Choose another worker or time.'});
     if (!workerIds.length) return res.status(400).json({message:'Select at least one worker'});
 
+    release=await scheduleLock(['booking:'+bookingId,...workerIds.map((id:string)=>'worker:'+id)]);
+    const fresh=await Booking.findById(bookingId);
+    if(!fresh||String(fresh.updatedAt)!==String(booking.updatedAt))return res.status(409).json({message:'Booking changed. Refresh before assigning a team.'});
+    await assertScheduleFree(String(bookingId),workerIds,booking.scheduledDate,booking.scheduledTime,requestedService?.duration||2);
     booking.workers = workerIds;
     booking.worker = workerIds[0] || undefined; // Legacy compatibility
-    booking.status = 'confirmed';
+    if(booking.status==='pending')booking.status = 'confirmed';
 
     const updatedBooking = await booking.save();
     res.json(updatedBooking);
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
+    res.status((error as any).status||500).json({ message: (error as any).status?(error as any).message:'Assignment could not be saved' });
+  } finally {await release?.();}
 };
 
 // @desc    Get dashboard statistics
@@ -189,41 +199,19 @@ export const getAdminStats = async (req: Request, res: Response) => {
 // @route   POST /api/admin/bookings
 // @access  Private/Admin
 export const createBookingByAdmin = async (req: Request, res: Response) => {
-  const {
-    user,
-    service,
-    worker,
-    address,
-    squareFootage,
-    scheduledDate,
-    scheduledTime,
-    totalAmount,
-  } = req.body;
-
-  if (!user || !service || !address || !scheduledDate || !scheduledTime) {
-    return res.status(400).json({ message: 'Please provide all required fields' });
-  }
-
-  try {
-    const booking = new Booking({
-      user,
-      service,
-      worker: worker || undefined, // Optional worker assignment
-      address,
-      squareFootage,
-      scheduledDate,
-      scheduledTime,
-      totalAmount,
-      status: worker ? 'confirmed' : 'pending', // Confirmed if worker assigned, otherwise pending
-      paymentStatus: 'pending',
-    });
-
-    const createdBooking = await booking.save();
-    res.status(201).json(createdBooking);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
+ const {user,service,worker,address,squareFootage,scheduledDate,scheduledTime}=req.body;
+ const units=Number(squareFootage);let release:(()=>Promise<void>)|undefined;
+ if(!mongoose.isValidObjectId(user)||!mongoose.isValidObjectId(service)||(worker&&!mongoose.isValidObjectId(worker))||typeof address!=='string'||!address.trim()||!Number.isFinite(units)||units<=0||typeof scheduledTime!=='string'||!validFutureSchedule(scheduledDate,scheduledTime))return res.status(400).json({message:'Provide a customer, service, address, valid quantity and schedule'});
+ try{
+ const customer=await User.findOne({_id:user,role:'user'});const savedService=await (await import('../models/Service')).default.findById(service).populate('unitConfig');
+ if(!customer||!savedService)return res.status(404).json({message:'Customer or service unavailable'});
+ if(savedService.isCustom&&String(savedService.createdBy)!==String(user))return res.status(403).json({message:'This custom service belongs to another customer'});
+ const unitType=(savedService.unitConfig as any)?.unitType||(savedService.pricePerSqFt>0&&savedService.pricePerUnit===0?'square':'unit');
+ const totalAmount=(savedService.basePrice||0)+units*(unitType==='square'?(savedService.pricePerSqFt||0):(savedService.pricePerUnit||0));
+ const booking=new Booking({...bookingSnapshots(savedService,customer,units,unitType),user,service,worker:worker||undefined,workers:worker?[worker]:[],address:address.trim(),squareFootage:units,units,unitType,scheduledDate,scheduledTime,totalAmount,status:worker?'confirmed':'pending',paymentStatus:'pending'});
+ if(worker){if(!await User.exists({_id:worker,role:'worker'}))return res.status(404).json({message:'Worker unavailable'});release=await scheduleLock(['worker:'+worker]);await assertScheduleFree(String(booking._id),[worker],scheduledDate,scheduledTime,savedService.duration||2);}
+ await booking.save();res.status(201).json(booking);
+ }catch(error:any){res.status(error.status||500).json({message:error.status?error.message:'Booking could not be created'});}finally{await release?.();}
 };
 
 // @desc    Get all admins
@@ -332,59 +320,9 @@ export const deleteAdmin = removeAdministrator;
 // @desc    Bulk update booking status
 // @route   PUT /api/admin/bookings/bulk-update
 // @access  Private/Admin
-export const bulkUpdateBookings = async (req: AuthenticatedRequest, res: Response) => {
-  const { bookingIds, status } = req.body;
-
-  if (!bookingIds || !Array.isArray(bookingIds) || !status) {
-    return res.status(400).json({ message: 'Please provide bookingIds array and status' });
-  }
-
-  const validStatuses = ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'];
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ message: 'Invalid status' });
-  }
-
-  try {
-    const result = await Booking.updateMany(
-      { _id: { $in: bookingIds } },
-      { status }
-    );
-
-    res.json({
-      message: `Updated ${result.modifiedCount} bookings to ${status}`,
-      modifiedCount: result.modifiedCount
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
-};
-
-// @desc    Bulk cancel bookings
-// @route   PUT /api/admin/bookings/bulk-cancel
-// @access  Private/Admin
-export const bulkCancelBookings = async (req: AuthenticatedRequest, res: Response) => {
-  const { bookingIds } = req.body;
-
-  if (!bookingIds || !Array.isArray(bookingIds)) {
-    return res.status(400).json({ message: 'Please provide bookingIds array' });
-  }
-
-  try {
-    const result = await Booking.updateMany(
-      { _id: { $in: bookingIds } },
-      { status: 'cancelled' }
-    );
-
-    res.json({
-      message: `Cancelled ${result.modifiedCount} bookings`,
-      modifiedCount: result.modifiedCount
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
-};
+async function handleBulkStatus(req:AuthenticatedRequest,res:Response,status:string){const ids=req.body.bookingIds;if(!Array.isArray(ids)||!ids.length||ids.length>100||new Set(ids).size!==ids.length||ids.some(id=>!mongoose.isValidObjectId(id))||!['pending','confirmed','in-progress','completed','cancelled'].includes(status))return res.status(400).json({message:'Choose up to 100 distinct valid bookings and a status'});try{const count=await bulkTransition(ids,status);res.json({message:'Updated '+count+' bookings',modifiedCount:count});}catch(error:any){res.status(error.status||500).json({message:error.status?error.message:'Booking updates could not be saved'});}}
+export const bulkUpdateBookings=(req:AuthenticatedRequest,res:Response)=>handleBulkStatus(req,res,req.body.status);
+export const bulkCancelBookings=(req:AuthenticatedRequest,res:Response)=>handleBulkStatus(req,res,'cancelled');
 
 // @desc    Bulk delete users
 // @route   DELETE /api/admin/users/bulk-delete
@@ -392,7 +330,7 @@ export const bulkCancelBookings = async (req: AuthenticatedRequest, res: Respons
 export const bulkDeleteUsers = async (req: AuthenticatedRequest, res: Response) => {
   const { userIds } = req.body;
 
-  if (!userIds || !Array.isArray(userIds)) {
+  if (!Array.isArray(userIds) || !userIds.length || userIds.length>100 || userIds.some(id=>!mongoose.isValidObjectId(id))) {
     return res.status(400).json({ message: 'Please provide userIds array' });
   }
 
@@ -423,36 +361,8 @@ export const bulkDeleteUsers = async (req: AuthenticatedRequest, res: Response) 
 // @route   PUT /api/admin/users/bulk-block
 // @access  Private/Admin
 export const bulkBlockUsers = async (req: AuthenticatedRequest, res: Response) => {
-  const { userIds, block } = req.body;
-
-  if (!userIds || !Array.isArray(userIds)) {
-    return res.status(400).json({ message: 'Please provide userIds array' });
-  }
-
-  try {
-    // Filter out admin users - don't block/unblock them
-    const users = await User.find({ _id: { $in: userIds } });
-    const nonAdminUserIds = users
-      .filter(u => !['admin','superadmin'].includes(u.role) && String(u._id) !== String(req.ownership?.ownerId))
-      .map(u => u._id);
-
-    if (nonAdminUserIds.length === 0) {
-      return res.status(400).json({ message: 'No non-admin users selected for blocking/unblocking' });
-    }
-
-    const result = await User.updateMany(
-      { _id: { $in: nonAdminUserIds } },
-      { isBlocked: block }
-    );
-
-    res.json({
-      message: `${block ? 'Blocked' : 'Unblocked'} ${result.modifiedCount} users (admins were skipped)`,
-      modifiedCount: result.modifiedCount
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
+ const {userIds,block}=req.body;if(!Array.isArray(userIds)||!userIds.length||userIds.length>100||userIds.some(id=>!mongoose.isValidObjectId(id))||typeof block!=='boolean')return res.status(400).json({message:'Provide valid account IDs and a block choice'});
+ try{const users=await User.find({_id:{$in:userIds},role:{$in:['user','worker','blocked']}});let count=0;for(const user of users){if(String(user._id)===String(req.ownership?.ownerId))continue;if(block&&user.role!=='blocked'){const result=await User.updateOne({_id:user._id,role:user.role},{$set:{blockedFromRole:user.role,role:'blocked'},$inc:{sessionVersion:1}});count+=result.modifiedCount;}else if(!block&&user.role==='blocked'){const result=await User.updateOne({_id:user._id,role:'blocked'},{$set:{role:user.blockedFromRole||'user'},$unset:{blockedFromRole:1},$inc:{sessionVersion:1}});count+=result.modifiedCount;}req.app?.get('io')?.to('user:'+user._id).emit('session-revoked');req.app?.get('io')?.in('user:'+user._id).disconnectSockets(true);}res.json({message:(block?'Blocked ':'Unblocked ')+count+' accounts',modifiedCount:count});}catch{res.status(500).json({message:'Account access could not be updated'});}
 };
 
 // @desc    Get admin settings
@@ -574,7 +484,8 @@ export const verifyWorker = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'User is not a worker' });
     }
 
-    worker.isVerified = isVerified;
+    if (isVerified !== true) return res.status(400).json({message:'Worker accounts remain active automatically'});
+    worker.isVerified = true;
     await worker.save();
 
     res.json({
@@ -645,7 +556,7 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response) =
 // @access  Private/Admin
 export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-
+  if(!mongoose.isValidObjectId(id))return res.status(400).json({message:'Invalid account'});
   try {
     const user = await User.findById(id);
 

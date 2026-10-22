@@ -9,7 +9,8 @@ const pair=(userId:string,contactId:string)=>({$or:[{senderId:userId,receiverId:
 const emitChange=(req:ChatRequest,message:InstanceType<typeof Message>)=>req.app.get('io')?.to('user:'+message.senderId).to('user:'+message.receiverId).emit('messageUpdated',message.toObject());
 export async function contactFilter(user:{id:string;role:string}){
  const base={_id:{$ne:user.id}};
- if(['admin','superadmin'].includes(user.role))return {...base,role:{$in:['user','worker','admin','superadmin']}};
+ if(user.role==='admin')return {...base,role:{$in:['user','admin','superadmin']}};
+ if(user.role==='superadmin')return {...base,role:{$in:['user','worker','admin','superadmin']}};
  const bookings=await Booking.find(user.role==='user'?{user:user.id}:{$or:[{worker:user.id},{workers:user.id}]}).select('user worker workers').lean();
  const ids=bookings.flatMap(b=>user.role==='user'?[b.worker,...(b.workers||[])]:[b.user]).filter(Boolean);
  return {...base,$or:[{role:{$in:user.role==='worker'?['superadmin']:['admin','superadmin']}},{_id:{$in:ids},role:user.role==='user'?'worker':'user'}]};
@@ -56,6 +57,6 @@ export async function hideMessage(req:ChatRequest,res:Response){try{
  if(!record)return res.status(404).json({message:'Message not found'});
  req.app.get('io')?.to('user:'+userId).emit('messageHidden',{messageId});res.json({messageId,message:'Message deleted for you'});
  }catch{res.status(500).json({message:'Message could not be deleted for you'});}}
-export async function getUnreadCount(req:ChatRequest,res:Response){try{const unreadCount=await Message.countDocuments({receiverId:req.user!.id,isRead:false,hiddenFor:{$ne:req.user!.id},deletedAt:null});res.json({unreadCount});}catch{res.status(500).json({message:'Could not load unread count'});}}
+export async function getUnreadCount(req:ChatRequest,res:Response){try{const contacts=await User.find(await contactFilter(req.user!)).select('_id').lean();const unreadCount=await Message.countDocuments({senderId:{$in:contacts.map(c=>c._id)},receiverId:req.user!.id,isRead:false,hiddenFor:{$ne:req.user!.id},deletedAt:null});res.json({unreadCount});}catch{res.status(500).json({message:'Could not load unread count'});}}
 
 export async function markConversationRead(req:ChatRequest,res:Response){try{const contactId=String(req.params.contactId),userId=req.user!.id;if(!valid(contactId))return res.status(400).json({message:'Invalid conversation'});if(!await allowedContact(req.user!,contactId))return res.status(403).json({message:'This contact is not available for your account'});await Message.updateMany({senderId:contactId,receiverId:userId,hiddenFor:{$ne:userId},isRead:false},{$set:{isRead:true}});req.app.get('io')?.to('user:'+contactId).emit('messagesRead',{readerId:userId});res.json({success:true});}catch{res.status(500).json({message:'Could not mark messages read'});}}

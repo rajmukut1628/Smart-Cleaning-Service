@@ -35,7 +35,7 @@ interface CalendarEvent {
   start: Date;
   end: Date;
   allDay?: boolean;
-  resource?: any;
+  resource?: Booking;
   status?: string; // Add status for color coding
 }
 

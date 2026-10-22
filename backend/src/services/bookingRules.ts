@@ -1,0 +1,3 @@
+import {scheduleStart} from './scheduling';
+export function validFutureSchedule(date:unknown,time:unknown,now=Date.now()){if(typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date)||typeof time!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return false;const value=Date.parse(date+'T00:00Z');return Number.isFinite(value)&&new Date(value).toISOString().slice(0,10)===date&&scheduleStart(date,time)>now;}
+export function bookingSnapshots(service:any,customer:any,quantity:number,unitType:string){return {serviceSnapshot:{name:service.name,basePrice:service.basePrice||0,rate:unitType==='square'?(service.pricePerSqFt||0):(service.pricePerUnit||0),quantity,unitType,capturedAt:new Date()},customerSnapshot:{name:customer?.name,email:customer?.email,phone:customer?.phone}};}

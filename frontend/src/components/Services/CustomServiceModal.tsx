@@ -158,9 +158,7 @@ export default function CustomServiceModal({ onClose, onServiceCreated }: Custom
       onClose();
     } catch (error: unknown) {
       console.error('Error creating custom service:', error);
-      const message = axios.isAxiosError(error) && error.response?.data?.message
-        ? error.response.data.message
-        : 'Failed to create custom service';
+      const message = (axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined)||'Failed to create custom service';
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -168,7 +166,7 @@ export default function CustomServiceModal({ onClose, onServiceCreated }: Custom
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">

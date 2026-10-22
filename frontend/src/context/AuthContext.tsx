@@ -1,27 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { imageUrl } from '../utils/imageUrl';
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { User } from '../types';
+import {AuthContext,type AuthenticatedUser} from './authState';
 import { API_BASE_URL } from '../config/apiConfig';
-
-// Combine backend response with existing User type
-type AuthenticatedUser = User & {
-  token?: string;
-};
-
-interface AuthContextType {
-  user: AuthenticatedUser | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  loginWithGoogle: (credential: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, phone: string) => Promise<{ verificationId: string; email: string; retryAfter: number }>;
-  verifyRegistration: (verificationId: string, code: string) => Promise<void>;
-  logout: () => void;
-  updateUserProfile: (userData: Partial<AuthenticatedUser>) => void;
-  isLoading: boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL = `${API_BASE_URL}/api`;
 
@@ -30,7 +12,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const establishSession = (userData: any) => {
+  const establishSession = (userData: Omit<AuthenticatedUser,'id'> & {_id:string}) => {
     const authenticatedUser: AuthenticatedUser = {
       id: userData._id,
       name: userData.name,
@@ -127,13 +109,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }
 

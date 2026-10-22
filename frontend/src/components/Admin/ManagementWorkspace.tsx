@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowUpRight, Briefcase, ChevronRight, Layers3, RefreshCw, Settings2, ShieldCheck, Sparkles, Users, Wand2 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import ServiceManagement from './ServiceManagement';
 import UnitManagement from './UnitManagement';
 import AdminManagement from './AdminManagement';
@@ -13,14 +13,14 @@ import { MANAGEMENT_UPDATED } from './managementEvents';
 
 const modules = [
   { id: 'users', label: 'People', detail: 'Accounts & roles', icon: Users, component: UserManagement },
-  { id: 'workers', label: 'Workforce', detail: 'Profiles & verification', icon: Briefcase, component: WorkerManagement },
+  { id: 'workers', label: 'Workforce', detail: 'Team profiles', icon: Briefcase, component: WorkerManagement },
   { id: 'services', label: 'Service catalog', detail: 'Services & pricing', icon: Sparkles, component: ServiceManagement },
   { id: 'admins', label: 'Ownership & access', detail: 'Owner & administrators', icon: ShieldCheck, component: AdminManagement },
   { id: 'units', label: 'Measurement units', detail: 'Booking configuration', icon: Layers3, component: UnitManagement },
   { id: 'bulk', label: 'Bulk actions', detail: 'Manage records together', icon: Wand2, component: BulkOperations },
 ] as const;
-interface AccountSummary { _id: string; role: string; isVerified?: boolean }
-interface Overview { customers: number; workers: number; verified: number; admins: number; services: number; accounts: number }
+interface AccountSummary { _id: string; role: string }
+interface Overview { customers: number; workers: number; admins: number; services: number; accounts: number }
 
 export default function ManagementWorkspace() {
   const { user } = useAuth();
@@ -37,7 +37,7 @@ export default function ManagementWorkspace() {
     try {
       const [people, services] = await Promise.all([axios.get<AccountSummary[]>('/api/admin/users'), axios.get<unknown[]>('/api/services')]);
       const accounts = people.data;
-      setOverview({customers:accounts.filter(account=>account.role==='user').length,workers:accounts.filter(account=>account.role==='worker').length,verified:accounts.filter(account=>account.role==='worker'&&account.isVerified).length,admins:accounts.filter(account=>['admin','superadmin'].includes(account.role)).length,services:services.data.length,accounts:accounts.length});
+      setOverview({customers:accounts.filter(account=>account.role==='user').length,workers:accounts.filter(account=>account.role==='worker').length,admins:accounts.filter(account=>['admin','superadmin'].includes(account.role)).length,services:services.data.length,accounts:accounts.length});
       setUpdated(new Date());
     } catch { setFailed(true); }
     finally { setLoading(false); }
@@ -47,7 +47,7 @@ export default function ManagementWorkspace() {
   const select = (id: string) => setParams(previous => { const next = new URLSearchParams(previous); next.delete('tab'); next.set('module',id); return next; });
   const cards = [
     {label:'Customer accounts',value:overview?.customers,note:'Registered customers',target:'users',icon:Users},
-    {label:'Workforce',value:overview?.workers,note:overview ? `${overview.verified} verified workers` : 'Worker verification',target:'workers',icon:Briefcase},
+    {label:'Workforce',value:overview?.workers,note:'Cleaning professionals',target:'workers',icon:Briefcase},
     {label:'Service catalog',value:overview?.services,note:'Available services',target:'services',icon:Sparkles},
     {label:'Administrators',value:overview?.admins,note:'Admin & superadmin',target:'admins',icon:ShieldCheck},
   ];

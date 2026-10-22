@@ -1,3 +1,4 @@
+import {validFutureSchedule,bookingSnapshots} from '../services/bookingRules';
 import { isUploadedImage } from '../utils/imageStorage';
 import { Request, Response } from 'express';
 import Booking from '../models/Booking';
@@ -45,7 +46,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
 
     // Pricing comes from the saved service, never a customer-supplied unit override.
     const units = Number(squareFootage);
-    if (!Number.isFinite(units) || units <= 0 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(scheduledTime) || !Number.isFinite(new Date(scheduledDate).getTime())) return res.status(400).json({ message: 'Valid quantity, date and time are required' });
+    if (!Number.isFinite(units) || units <= 0 || !validFutureSchedule(scheduledDate,scheduledTime)) return res.status(400).json({ message: 'Valid quantity, date and time are required' });
     if (service.isCustom && service.createdBy?.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'This custom service belongs to another customer' });
 
     // Calculation logic mirroring frontend:
@@ -57,6 +58,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     }
 
     const booking = new Booking({
+      ...bookingSnapshots(service,req.user,units,unitType),
       user: req.user._id,
       service: serviceId,
       address,
@@ -187,29 +189,9 @@ export const repeatBooking = async (req: AuthenticatedRequest, res: Response) =>
       return res.status(400).json({ message: 'Can only repeat completed bookings' });
     }
 
-    // Create new booking with same details
-    const newBooking = new Booking({
-      user: req.user._id,
-      service: originalBooking.service,
-      address: originalBooking.address,
-      squareFootage: originalBooking.squareFootage,
-      units: originalBooking.units,
-      unitType: originalBooking.unitType,
-      scheduledDate: new Date(), // Set to current date, user can change later
-      scheduledTime: originalBooking.scheduledTime,
-      specialInstructions: originalBooking.specialInstructions,
-      totalAmount: originalBooking.totalAmount,
-      status: 'pending',
-      paymentStatus: 'pending',
-    });
-
-    const createdBooking = await newBooking.save();
-    const populatedBooking = await Booking.findById(createdBooking._id).populate('service', 'name');
-
-    res.status(201).json({
-      message: 'Booking repeated successfully',
-      booking: populatedBooking
-    });
+    if(!validFutureSchedule(req.body.scheduledDate,req.body.scheduledTime))return res.status(400).json({message:'Choose a future date and time for the repeat booking'});
+    req.body={serviceId:String(originalBooking.service),address:originalBooking.address,squareFootage:req.body.squareFootage??originalBooking.squareFootage,scheduledDate:req.body.scheduledDate,scheduledTime:req.body.scheduledTime,specialInstructions:originalBooking.specialInstructions};
+    return createBooking(req,res);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });

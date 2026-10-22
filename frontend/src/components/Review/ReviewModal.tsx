@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useState } from 'react';
 import { Star } from 'lucide-react';
 import api from '../../utils/axios';
@@ -49,9 +50,9 @@ export default function ReviewModal({ bookingId, onClose, onSuccess }: ReviewMod
       toast.success('Review submitted successfully!');
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Review submission error:', error);
-      toast.error(error.response?.data?.message || 'Failed to submit review');
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to submit review');
     } finally {
       setIsSubmitting(false);
     }
@@ -93,7 +94,7 @@ export default function ReviewModal({ bookingId, onClose, onSuccess }: ReviewMod
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">

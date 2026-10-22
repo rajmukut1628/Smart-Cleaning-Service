@@ -1,5 +1,5 @@
 import ChangePasswordModal from '../User/ChangePasswordModal';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
@@ -88,8 +88,8 @@ export default function AdminProfile() {
       updateUserProfile(formData);
       toast.success('Profile updated successfully');
       fetchProfile();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to update profile');
+    } catch (error: unknown) {
+      toast.error((axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || 'Failed to update profile');
     }
   };
 
@@ -109,7 +109,7 @@ export default function AdminProfile() {
       link.click();
       link.remove();
       toast.success(`${type} data exported successfully`);
-    } catch (error) {
+    } catch {
       toast.error('Failed to export data');
     }
   };
@@ -138,7 +138,7 @@ export default function AdminProfile() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'profile'|'security')}
               className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${activeTab === tab.id
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'

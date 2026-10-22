@@ -1,6 +1,7 @@
+import axios from 'axios';
 import { Link } from 'react-router-dom';
 import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import GoogleIdentityButton from './GoogleIdentityButton';
@@ -25,8 +26,8 @@ export default function LoginForm({ onSwitchPage }: LoginFormProps) {
     try {
       await login(email, password);
       toast.success('Successfully logged in!');
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Invalid credentials. Please try again.';
+    } catch (error: unknown) {
+      const errorMessage = (axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || (error instanceof Error?error.message:undefined) || 'Invalid credentials. Please try again.';
       setError(errorMessage);
       toast.error(errorMessage, {
         duration: 4000,

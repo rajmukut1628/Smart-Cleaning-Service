@@ -3,7 +3,7 @@ import axios from 'axios';
 import { CalendarDays, Check, Loader2, MapPin, ShieldCheck, Sparkles, UserRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import {useAuth} from '../../context/authState';
 import { Service } from '../../types';
 import BookingDialog from './BookingDialog';
 import { resolveServiceUnit, serviceUnitRate } from '../../utils/servicePricing';
@@ -50,7 +50,7 @@ export default function BookingModal({ service, onClose }: Props) {
     if (!form.address.trim() || needsUnits && (!config || Number(form.squareFootage) < 1)) { setError('Enter your service address and a valid service quantity.'); return; }
     setBusy(true); setError('');
     try { await axios.post('/api/bookings', { unitType: config.unitType, serviceId: service.id || (service as Service & { _id?: string })._id, address: form.address.trim(), squareFootage: parseInt(form.squareFootage) || 0, scheduledDate: form.scheduledDate, scheduledTime: form.scheduledTime, specialInstructions: form.specialInstructions }); toast.success('Booking created. You can track it in your dashboard.'); onClose(); }
-    catch (err) { setError(axios.isAxiosError(err) ? err.response?.data?.message || 'Could not create your booking. Please try again.' : 'Could not create your booking.'); }
+    catch (err) { setError(axios.isAxiosError(err) ? (axios.isAxiosError<{message:string}>(err)?err.response?.data.message:undefined) || 'Could not create your booking. Please try again.' : 'Could not create your booking.'); }
     finally { setBusy(false); }
   };
   if (user?.role !== 'user') return null;
