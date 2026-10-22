@@ -43,7 +43,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
       unitType = 'square';
     }
 
-    if (!service.unitConfig && ['square', 'unit', 'others'].includes(req.body.unitType)) unitType = req.body.unitType;
+    // Pricing comes from the saved service, never a customer-supplied unit override.
     const units = Number(squareFootage);
     if (!Number.isFinite(units) || units <= 0 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(scheduledTime) || !Number.isFinite(new Date(scheduledDate).getTime())) return res.status(400).json({ message: 'Valid quantity, date and time are required' });
     if (service.isCustom && service.createdBy?.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'This custom service belongs to another customer' });

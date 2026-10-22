@@ -1,3 +1,4 @@
+import { resolveServiceUnit, serviceUnitRate } from '../../utils/servicePricing';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { CalendarDays, MapPin, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
@@ -35,9 +36,9 @@ export default function CreateBookingModal({ onBookingCreated }: { onBookingCrea
   }, [open, isAdmin, retry]);
   const service = services.find(item => item._id === form.service);
   const customer = customers.find(item => item._id === form.customer);
-  const config = service?.unitConfig;
-  const unitType = config?.unitType || 'square';
-  const rate = unitType === 'square' ? service?.pricePerSqFt || 0 : service?.pricePerUnit || 0;
+  const config = service ? resolveServiceUnit(service) : undefined;
+  const unitType = config?.unitType || 'unit';
+  const rate = service && config ? serviceUnitRate(service, config) : 0;
   const total = (service?.basePrice || 0) + (Number(form.units) || 0) * rate;
   const change = (key: keyof typeof form, value: string) => setForm(previous => ({ ...previous, [key]: value }));
   const chooseCustomer = (id: string) => { const selected = customers.find(item => item._id === id); setForm(previous => ({ ...previous, customer: id, address: selected?.address || '' })); };

@@ -1,0 +1,7 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');
+const Service=require('../dist/models/Service').default;const Booking=require('../dist/models/Booking').default;const {createBooking}=require('../dist/controllers/bookingController');
+const oid='507f1f77bcf86cd799439011';
+async function check(service,unitType,expectedUnit,expectedAmount){const find=Service.findById,save=Booking.prototype.save;let stored;Service.findById=()=>({populate:async()=>service});Booking.prototype.save=async function(){stored=this;return this;};try{const res={code:200,status(code){this.code=code;return this;},json(body){this.body=body;return this;}};await createBooking({user:{_id:oid},body:{serviceId:oid,address:'Test address',squareFootage:100,scheduledDate:'2026-11-01',scheduledTime:'10:00',unitType}},res);assert.equal(res.code,201);assert.equal(stored.unitType,expectedUnit);assert.equal(stored.totalAmount,expectedAmount);assert.equal(String(stored.user),oid);}finally{Service.findById=find;Booking.prototype.save=save;}}
+test('unlinked square-foot services retain their saved rate even if the client submits a unit override',()=>check({basePrice:500,pricePerSqFt:15,pricePerUnit:0},'unit','square',2000));
+test('unlinked quantity services retain their saved per-unit price',()=>check({basePrice:500,pricePerSqFt:0,pricePerUnit:20},'square','unit',2500));
+test('a saved linked configuration controls pricing despite the client override',()=>check({basePrice:500,pricePerSqFt:15,pricePerUnit:20,unitConfig:{unitType:'others'}},'square','others',2500));
