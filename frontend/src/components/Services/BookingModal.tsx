@@ -1,365 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { CalendarDays, Check, Loader2, MapPin, ShieldCheck, Sparkles, UserRound } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Service } from '../../types';
-
-interface UnitOption {
-  label: string;
-  value: number;
-  _id?: string;
-}
-
-interface UnitConfigType {
-  _id: string;
-  unitType: string;
-  label: string;
-  options: UnitOption[];
-  allowCustom: boolean;
-  customPlaceholder: string;
-  isActive: boolean;
-  order: number;
-}
-
-interface BookingModalProps {
-  service: Service;
-  onClose: () => void;
-}
-
-export default function BookingModal({ service, onClose }: BookingModalProps) {
+import BookingDialog from './BookingDialog';
+interface UnitConfig { _id: string; unitType: string; label: string; isActive: boolean; customPlaceholder?: string }
+interface Props { service: Service; onClose: () => void }
+export default function BookingModal({ service, onClose }: Props) {
   const { user } = useAuth();
-  const [formData, setFormData] = useState({
-    address: '',
-    areaUnit: '',
-    squareFootage: '1',
-    scheduledDate: '',
-    scheduledTime: '',
-    specialInstructions: ''
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedUnitType, setSelectedUnitType] = useState<'predefined' | 'custom'>('predefined');
-  const [unitConfigs, setUnitConfigs] = useState<UnitConfigType[]>([]);
-  const [loadingConfigs, setLoadingConfigs] = useState(true);
-
-  // Fetch unit configurations on component mount
+  const [form, setForm] = useState({ address: user?.address || '', areaUnit: '', squareFootage: '1', scheduledDate: '', scheduledTime: '', specialInstructions: '' });
+  const [contact, setContact] = useState({ name: user?.name || '', email: user?.email || '', phone: user?.phone || '' });
+  const [configs, setConfigs] = useState<UnitConfig[]>([]);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState(false);
+  const [profileError, setProfileError] = useState(false);
+  const [custom, setCustom] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const addressEdited = useRef(false);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
-    const fetchUnitConfigs = async () => {
-      try {
-        const response = await axios.get('/api/unit-configs');
-        setUnitConfigs(response.data);
-
-        // Find if service has a linked unitConfig and set it as default areaUnit
-        if (service.unitConfig) {
-          const linkedConfig = response.data.find((c: any) => c._id === service.unitConfig || c._id === (service.unitConfig as any)._id);
-          if (linkedConfig) {
-            setFormData(prev => ({ ...prev, areaUnit: linkedConfig.unitType }));
-          }
-        } else if (response.data.length > 0) {
-          setFormData(prev => ({ ...prev, areaUnit: response.data[0].unitType }));
-        }
-      } catch (err) {
-        console.error('Failed to fetch unit configurations:', err);
-      } finally {
-        setLoadingConfigs(false);
-      }
-    };
-
-    fetchUnitConfigs();
-  }, [service.unitConfig]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    if (name === 'areaUnit') {
-      setFormData(prev => ({ ...prev, [name]: value, squareFootage: '' }));
-      setSelectedUnitType('predefined');
-    } else if (name === 'squareFootage' && value === 'custom') {
-      setSelectedUnitType('custom');
-      setFormData(prev => ({ ...prev, squareFootage: '' }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    if (user?.role !== 'user') return;
+    const controller = new AbortController(); setProfileError(false);
+    axios.get('/api/profile', { signal: controller.signal }).then(({ data }) => {
+      if (data._id !== user.id || data.role !== 'user') throw new Error('Account mismatch');
+      setContact({ name: data.name, email: data.email, phone: data.phone || '' });
+      if (!addressEdited.current) setForm(previous => ({ ...previous, address: data.address || previous.address }));
+    }).catch(() => { if (!controller.signal.aborted) setProfileError(true); });
+    return () => controller.abort();
+  }, [user?.id, user?.role]);
+  useEffect(() => {
+    const controller = new AbortController(); setConfigLoading(true); setConfigError(false);
+    axios.get<UnitConfig[]>('/api/unit-configs', { signal: controller.signal }).then(({ data }) => {
+      setConfigs(data); const linkedId = typeof service.unitConfig === 'object' ? (service.unitConfig as { _id?: string })?._id : service.unitConfig;
+      const selected = data.find(config => config._id === linkedId) || (!linkedId ? data[0] : undefined);
+      setForm(previous => ({ ...previous, areaUnit: selected?.unitType || '' }));
+    }).catch(() => { if (!controller.signal.aborted) setConfigError(true); }).finally(() => { if (!controller.signal.aborted) setConfigLoading(false); });
+    return () => controller.abort();
+  }, [service.unitConfig, retry]);
+  const config = configs.find(item => item.unitType === form.areaUnit);
+  const perUnit = (service as Service & { pricePerUnit?: number }).pricePerUnit || 0;
+  const needsUnits = service.pricePerSqFt > 0 || perUnit > 0 || !!service.unitConfig;
+  const rate = config?.unitType === 'square' ? service.pricePerSqFt || 0 : perUnit;
+  const total = (service.basePrice || 0) + (Number(form.squareFootage) || 0) * rate;
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+  const change = (key: keyof typeof form, value: string) => setForm(previous => ({ ...previous, [key]: value }));
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault(); if (busy) return;
+    if (!form.address.trim() || needsUnits && (!config || Number(form.squareFootage) < 1)) { setError('Enter your service address and a valid service quantity.'); return; }
+    setBusy(true); setError('');
+    try { await axios.post('/api/bookings', { unitType: form.areaUnit, serviceId: service.id || (service as Service & { _id?: string })._id, address: form.address.trim(), squareFootage: parseInt(form.squareFootage) || 0, scheduledDate: form.scheduledDate, scheduledTime: form.scheduledTime, specialInstructions: form.specialInstructions }); toast.success('Booking created. You can track it in your dashboard.'); onClose(); }
+    catch (err) { setError(axios.isAxiosError(err) ? err.response?.data?.message || 'Could not create your booking. Please try again.' : 'Could not create your booking.'); }
+    finally { setBusy(false); }
   };
-
-  const calculateTotal = () => {
-    if (!service) return 0;
-
-    const units = Number(formData.squareFootage) || 0;
-    const basePrice = service.basePrice || 0;
-
-    // Check if it's a Square Feet based service or Unit based
-    const unitConfig = unitConfigs.find(c => c.unitType === formData.areaUnit);
-
-    if (unitConfig?.unitType === 'square') {
-      return basePrice + (units * (service.pricePerSqFt || 0));
-    } else {
-      // For Car Wash (unit based) or others
-      return basePrice + (units * ((service as any).pricePerUnit || 0));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-
-    const bookingData = {
-      unitType: formData.areaUnit,
-      serviceId: service.id || (service as any)._id,
-      address: formData.address,
-      squareFootage: parseInt(formData.squareFootage) || 0,
-      scheduledDate: formData.scheduledDate,
-      scheduledTime: formData.scheduledTime,
-      specialInstructions: formData.specialInstructions,
-    };
-
-    try {
-      await axios.post('/api/bookings', bookingData);
-      alert('Booking created successfully! You can view it in your dashboard.');
-      onClose();
-    } catch (err: any) {
-      const message = err.response?.data?.message || 'Failed to create booking. Please try again.';
-      setError(message);
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!service) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Book {service.name}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <XMarkIcon className="h-6 w-6" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* User Info */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-medium text-gray-900 mb-2">Your Information</h3>
-            <div className="text-sm text-gray-700">
-              <p><span className="font-medium">Name:</span> {user?.name}</p>
-              <p><span className="font-medium">Email:</span> {user?.email}</p>
-            </div>
-          </div>
-
-          <p className="rounded-xl bg-blue-50 p-4 text-sm text-blue-800">Pay cash after the service. Your payment status updates when an administrator confirms receipt.</p>
-          {/* Service Info */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-medium text-gray-900 mb-2">Service Details</h3>
-            {service.pricePerSqFt > 0 ? (
-              <div className="flex items-center justify-between text-sm">
-                <span>Base Price: ৳{service.basePrice.toLocaleString()}</span>
-                <span>Per Sq Ft: ৳{service.pricePerSqFt}</span>
-              </div>
-            ) : (service as any).pricePerUnit > 0 ? (
-              <div className="flex items-center justify-between text-sm">
-                <span>Base Price: ৳{service.basePrice.toLocaleString()}</span>
-                <span>Per Unit: ৳{(service as any).pricePerUnit}</span>
-              </div>
-            ) : (
-              <div className="text-sm">
-                <span className="font-medium">Fixed Price: ৳{service.basePrice.toLocaleString()}</span>
-              </div>
-            )}
-          </div>
-          {/* Area/Quantity Unit Selection */}
-          {(service.pricePerSqFt > 0 || (service as any).pricePerUnit > 0 || service.unitConfig) && (
-            <>
-              {loadingConfigs ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                </div>
-              ) : (
-                <>
-                  {/* Auto-selected Area/Quantity Section */}
-                  {unitConfigs.map((config) => {
-                    if (config.unitType !== formData.areaUnit) return null;
-
-                    return (
-                      <div key={config._id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <label className="block text-sm font-semibold text-gray-900 mb-3">
-                          {config.label}
-                        </label>
-
-                        {config.unitType === 'square' ? (
-                          /* Standard input for Square feet */
-                          <div className="space-y-2">
-                            <input
-                              name="squareFootage"
-                              type="number"
-                              min="1"
-                              value={formData.squareFootage}
-                              onChange={(e) => setFormData(prev => ({ ...prev, squareFootage: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-black"
-                              placeholder={config.customPlaceholder || "Enter area size"}
-                            />
-                          </div>
-                        ) : (
-                          /* Smart Quantity Selector for Units (Car Wash, etc.) */
-                          <div className="space-y-4">
-                            <div className="flex flex-wrap gap-2">
-                              {[1, 2, 3, 4, 5, 10].map((num) => (
-                                <button
-                                  key={num}
-                                  type="button"
-                                  onClick={() => {
-                                    setFormData(prev => ({ ...prev, squareFootage: String(num) }));
-                                    setSelectedUnitType('predefined');
-                                  }}
-                                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${formData.squareFootage === String(num) && selectedUnitType === 'predefined'
-                                    ? 'bg-blue-600 text-white shadow-md'
-                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-blue-500'
-                                    }`}
-                                >
-                                  {num}
-                                </button>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedUnitType('custom');
-                                }}
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${selectedUnitType === 'custom'
-                                  ? 'bg-blue-600 text-white shadow-md'
-                                  : 'bg-white border border-gray-300 text-gray-700 hover:border-blue-500'
-                                  }`}
-                              >
-                                Custom
-                              </button>
-                            </div>
-
-                            {/* Custom Input Field */}
-                            {(selectedUnitType === 'custom' || !([1, 2, 3, 4, 5, 10].includes(Number(formData.squareFootage)))) && (
-                              <div className="flex items-center space-x-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                <input
-                                  name="squareFootage"
-                                  type="number"
-                                  min="1"
-                                  value={formData.squareFootage}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setFormData(prev => ({ ...prev, squareFootage: val }));
-                                    if (![1, 2, 3, 4, 5, 10].includes(Number(val))) {
-                                      setSelectedUnitType('custom');
-                                    }
-                                  }}
-                                  className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-black"
-                                  placeholder="Qty"
-                                />
-                                <span className="text-sm text-gray-600">{config.label}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </>
-          )}
-          {/* Form Fields */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Service Address</label>
-            <textarea
-              name="address"
-              required
-              value={formData.address}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              rows={3}
-              placeholder="Enter complete address with area and landmarks"
-            />
-          </div>
-
-
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
-              <input
-                name="scheduledDate"
-                type="date"
-                required
-                value={formData.scheduledDate}
-                onChange={handleInputChange}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Time</label>
-              <select
-                name="scheduledTime"
-                required
-                value={formData.scheduledTime}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Select time</option>
-                <option value="09:00">09:00 AM</option>
-                <option value="10:00">10:00 AM</option>
-                <option value="11:00">11:00 AM</option>
-                <option value="14:00">02:00 PM</option>
-                <option value="15:00">03:00 PM</option>
-                <option value="16:00">04:00 PM</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (Optional)</label>
-            <textarea
-              name="specialInstructions"
-              value={formData.specialInstructions}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              rows={3}
-              placeholder="Any specific requirements or instructions"
-            />
-          </div>
-
-          {/* Total Calculation */}
-          <div className="bg-blue-50 rounded-lg p-4">
-            <div className="border-t border-blue-200 pt-2 flex justify-between items-center">
-              <span className="font-semibold text-lg">Service Price:</span>
-              <span className="font-bold text-xl text-blue-600">
-                ৳{calculateTotal().toLocaleString()}
-              </span>
-            </div>
-          </div>
-
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
-              {error}
-            </div>
-          )}
-
-          <div className="flex space-x-4 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isLoading}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              {isLoading ? 'Confirming...' : 'Confirm Booking'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+  if (user?.role !== 'user') return null;
+  return <BookingDialog title="Plan your next clean." eyebrow="CUSTOMER BOOKING" description="Choose your schedule. We’ll take care of the rest." busy={busy} onClose={onClose}><form onSubmit={submit} className="bf-form"><div className="bf-scroll"><div className="bf-layout"><div className="bf-fields"><section className="bf-section"><h3><UserRound size={17}/>Your contact details <span>From your profile</span></h3><div className="bf-contact"><strong>{contact.name}</strong><span>{contact.email}</span><span>{contact.phone || 'Phone not added'}</span></div>{profileError && <p className="bf-help">Couldn’t refresh your profile. Check your contact details and address before booking.</p>}<Link className="bf-link" to="/profile" onClick={onClose}>Update my profile →</Link></section>
+    <section className="bf-section"><h3><MapPin size={17}/>Where should we clean?</h3><label>Service address<textarea required maxLength={500} rows={2} value={form.address} onChange={event => { addressEdited.current = true; change('address', event.target.value); }} placeholder="House, road, area, city and landmarks"/></label><p className="bf-help">Your saved address is filled in automatically. You can change it for this booking.</p></section>
+    {needsUnits && <section className="bf-section"><h3><Sparkles size={17}/>{config?.label || 'Service quantity'}</h3>{configLoading ? <p role="status" className="bf-help"><Loader2 size={14} className="inline animate-spin"/> Loading options…</p> : configError || !config ? <div role="alert" className="bf-error">Service options could not be loaded. <button type="button" onClick={() => setRetry(value => value + 1)}>Try again</button></div> : config.unitType === 'square' ? <label>Area in square feet<input required type="number" min="1" step="1" value={form.squareFootage} onChange={event => change('squareFootage', event.target.value)} placeholder={config.customPlaceholder || 'Enter total area'}/></label> : <><div className="bf-quantity">{[1,2,3,4,5,10].map(value => <button type="button" key={value} aria-pressed={!custom && form.squareFootage === String(value)} onClick={() => { change('squareFootage', String(value)); setCustom(false); }}>{value}</button>)}<button type="button" aria-pressed={custom} onClick={() => setCustom(true)}>Custom</button></div>{custom && <label>Quantity<input required type="number" min="1" step="1" value={form.squareFootage} onChange={event => change('squareFootage', event.target.value)}/></label>}</>}</section>}
+    <section className="bf-section"><h3><CalendarDays size={17}/>Choose your schedule</h3><div className="bf-grid"><label>Preferred date<input required type="date" min={today} value={form.scheduledDate} onInput={event => change('scheduledDate', event.currentTarget.value)} onChange={event => change('scheduledDate', event.target.value)}/></label><label>Preferred time<select required value={form.scheduledTime} onChange={event => change('scheduledTime', event.target.value)}><option value="">Select a time</option>{[['09:00','09:00 AM'],['10:00','10:00 AM'],['11:00','11:00 AM'],['14:00','02:00 PM'],['15:00','03:00 PM'],['16:00','04:00 PM']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label></div><label className="bf-instructions">Special instructions <small>Optional</small><textarea maxLength={2000} rows={2} value={form.specialInstructions} onChange={event => change('specialInstructions', event.target.value)} placeholder="Anything your cleaning team should know?"/></label></section></div>
+    <aside className="bf-summary"><span className="bf-summary-icon"><Sparkles size={22}/></span><p className="bf-eyebrow">YOUR SERVICE</p><h3>{service.name}</h3><div className="bf-price-line"><span>Base price</span><strong>৳{service.basePrice.toLocaleString()}</strong></div>{needsUnits && config && <div className="bf-price-line"><span>{form.squareFootage || '0'} × ৳{rate.toLocaleString()}</span><strong>৳{((Number(form.squareFootage) || 0) * rate).toLocaleString()}</strong></div>}<div className="bf-total"><span>Service total</span><strong>৳{total.toLocaleString()}</strong></div><div className="bf-payment"><ShieldCheck size={18}/><p><strong>Cash after service</strong><span>Your payment updates when an administrator confirms receipt.</span></p></div>{form.scheduledDate && <p className="bf-schedule">{form.scheduledDate} {form.scheduledTime && '· ' + form.scheduledTime}</p>}</aside></div>{error && <p className="bf-error" role="alert">{error}</p>}</div><footer className="bf-footer"><p><Check size={14}/>Review your details before confirming.</p><button type="button" className="bf-secondary" disabled={busy} onClick={onClose}>Cancel</button><button className="bf-primary" disabled={busy || needsUnits && (configLoading || configError || !config)}>{busy ? 'Confirming…' : 'Confirm booking'}</button></footer></form></BookingDialog>;
 }

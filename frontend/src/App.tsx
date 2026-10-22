@@ -11,6 +11,7 @@ import ModernLandingPage from './components/Home/ModernLandingPage';
 import { ContactPage, HowItWorksPage, ReviewsPage } from './components/Home/MarketingPages';
 import UserDashboard from './components/User/UserDashboard';
 import UserProfile from './components/User/UserProfile';
+import AccountSettings from './components/common/AccountSettings';
 import AdminAccountProfile from './components/Admin/AdminAccountProfile';
 import ServiceCatalog from './components/Services/ServiceCatalog';
 import ChatInterface from './components/Chat/ChatInterface';
@@ -89,6 +90,7 @@ function AppContent() {
 
       <main className={location.pathname === '/chat' ? 'max-w-7xl mx-auto min-h-0 px-3 py-3 sm:px-6 lg:px-8' : ['/', '/home', '/services', '/contact', '/reviews', '/how-it-works'].includes(location.pathname) ? '' : 'workspace-page max-w-7xl mx-auto py-2 px-4 sm:px-6 lg:px-8'}>
         <Routes>
+          {user.role !== 'worker' && <Route path="/settings" element={<AccountSettings />} />}
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />

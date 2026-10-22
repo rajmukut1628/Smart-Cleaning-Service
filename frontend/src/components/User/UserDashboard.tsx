@@ -1,3 +1,4 @@
+import CustomerSpending from './CustomerSpending';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
@@ -44,6 +45,7 @@ export default function UserDashboard(){
     </section><aside className="customer-dashboard-aside"><section className="customer-next-card"><p className="customer-next-eyebrow">{nextBooking?.status==='in-progress'?'HAPPENING NOW':'YOUR SERVICE OUTLOOK'}</p><span className="customer-next-icon"><CalendarDaysIcon className="h-6 w-6"/></span>{loading?<h2>Checking your schedule…</h2>:error?<><h2>Schedule unavailable</h2><p>Refresh your bookings to check your latest schedule.</p></>:nextBooking?<><h2>{nextBooking.service?.name||'Your cleaning service'}</h2><p>{date(nextBooking.scheduledDate)} · {nextBooking.scheduledTime}</p><div className="customer-next-address"><MapPinIcon className="h-4 w-4 shrink-0"/>{nextBooking.address}</div><button onClick={()=>setDetails(nextBooking)}>View booking <ArrowUpRightIcon className="h-4 w-4"/></button></>:<><h2>A fresh space, on your schedule.</h2><p>Your active booking will appear here once you choose your next service.</p></>}</section>
     {!loading&&!error&&awaitingReview.length>0&&<section className="customer-aside-panel"><div className="customer-aside-heading"><span className="customer-aside-icon"><StarIcon className="h-4 w-4"/></span><h2>Your feedback matters</h2></div><p>{awaitingReview.length} completed {awaitingReview.length===1?'service is':'services are'} ready for your review.</p><button onClick={()=>{selectFilter('completed');setSearch('');}} className="customer-text-link">View completed services →</button></section>}
     <section className="customer-aside-panel"><div className="customer-aside-heading"><span className="customer-aside-icon"><ChatBubbleLeftRightIcon className="h-4 w-4"/></span><h2>Need a hand?</h2></div><p>For questions about a booking, contact admin support and include your booking reference.</p><Link to="/chat" className="customer-text-link">Open support chat →</Link></section></aside></div>
+    <CustomerSpending/>
     {details&&<BookingDetailsModal booking={details} onClose={()=>{setDetails(null);clearLink();}}/>}{review&&<ReviewModal bookingId={review._id} onClose={()=>{setReview(null);clearLink();}} onSuccess={()=>{setReview(null);clearLink();toast.success('Review submitted successfully!');void load();}}/>}
   </div>;
 }

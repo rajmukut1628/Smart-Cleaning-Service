@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { Camera, Check, KeyRound, Mail, MapPin, Pencil, Phone, ShieldCheck, UserRound, X } from 'lucide-react';
+import { Camera, Check, Mail, MapPin, Pencil, Phone, ShieldCheck, UserRound, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config/apiConfig';
-import ChangePasswordModal from '../User/ChangePasswordModal';
 
 interface AdminAccount {
   _id: string;
@@ -31,7 +30,6 @@ export default function AdminAccountProfile() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [pictureFailed, setPictureFailed] = useState(false);
-  const [passwordOpen, setPasswordOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const fetchProfile = useCallback(async () => {
     setLoading(true); setFailed(false);
@@ -75,7 +73,7 @@ export default function AdminAccountProfile() {
     { key: 'address', label: 'Address', type: 'text', icon: MapPin, required: false, autoComplete: 'street-address' },
   ] as const;
   return <div className="mx-auto max-w-5xl space-y-5">
-    <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-600">My account</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Account profile</h1><p className="mt-1 text-sm text-slate-500">Your personal details and account security, in one place.</p></div>
+    <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-600">My account</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Account profile</h1><p className="mt-1 text-sm text-slate-500">Your personal details and contact information.</p></div>
     <div className="grid items-start gap-5 lg:grid-cols-[280px_1fr]">
       <aside className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm"><div className="h-20 bg-gradient-to-br from-blue-950 via-blue-800 to-blue-500" /><div className="px-6 pb-6">
         <div className="relative -mt-10 mb-4 w-fit"><div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-blue-50 text-2xl font-bold text-blue-600 shadow-sm">{account.profilePicture && !pictureFailed ? <img src={pictureUrl(account.profilePicture)} alt={account.name} onError={() => setPictureFailed(true)} className="h-full w-full object-cover" /> : initials}</div><button disabled={uploading || saving || editing} onClick={() => fileInput.current?.click()} aria-label="Change profile photo" className="absolute -bottom-1 -right-2 rounded-full border-2 border-white bg-blue-600 p-2 text-white shadow-sm hover:bg-blue-700"><Camera size={14} /></button></div>
@@ -88,9 +86,7 @@ export default function AdminAccountProfile() {
         <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-4"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-bold text-slate-900">Personal information</h2><p className="mt-1 text-xs text-slate-400">Keep your contact details accurate.</p></div>{!editing && <button disabled={uploading} onClick={() => { setForm(formFor(account)); setEditing(true); }} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"><Pencil size={13} />Edit profile</button>}</div>
           {editing ? <form onSubmit={save}><div className="grid gap-4 sm:grid-cols-2">{fields.map(field => <label key={field.key} className="text-xs font-medium text-slate-600">{field.label}{!field.required && <span className="ml-1 font-normal text-slate-400">(optional)</span>}<input required={field.required} type={field.type} autoComplete={field.autoComplete} maxLength={field.key === 'address' ? 300 : 150} value={form[field.key]} onChange={event => setForm({ ...form, [field.key]: event.target.value })} disabled={saving} className="mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm text-slate-800" /></label>)}</div><div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={saving} onClick={() => { setForm(formFor(account)); setEditing(false); }} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100"><X size={13} />Cancel</button><button disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"><Check size={14} />{saving ? 'Saving…' : 'Save changes'}</button></div></form> : <dl className="grid gap-x-4 gap-y-5 sm:grid-cols-2">{fields.filter(field => Boolean(account[field.key])).map(field => <div key={field.key}><dt className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-400"><field.icon size={13} />{field.label}</dt><dd className="break-words text-sm font-medium text-slate-700">{account[field.key]}</dd></div>)}{!account.address && <div><dt className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-400"><MapPin size={13} />Address</dt><dd><button disabled={uploading} onClick={() => setEditing(true)} className="text-xs font-medium text-blue-600 hover:underline">Add address</button></dd></div>}</dl>}
         </section>
-        <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:px-6"><div className="flex items-center gap-3"><span className="rounded-xl bg-blue-50 p-2.5 text-blue-600"><KeyRound size={19} /></span><div><h2 className="text-sm font-bold text-slate-900">Password & security</h2><p className="mt-1 text-xs text-slate-400">Update your password when needed.</p></div></div><button onClick={() => setPasswordOpen(true)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:border-blue-200 hover:bg-blue-50">Change password</button></section>
       </div>
     </div>
-    {passwordOpen && <ChangePasswordModal onClose={() => setPasswordOpen(false)} />}
   </div>;
 }
