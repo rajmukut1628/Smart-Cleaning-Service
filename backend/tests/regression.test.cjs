@@ -101,9 +101,9 @@ test('customers cannot confirm payment or create administrators',async()=>{
  try{assert.equal((await request('/api/admin/bookings/1/payment','PUT',{paymentStatus:'paid'},token)).status,403);assert.equal((await request('/api/admin/admins','POST',{},token)).status,403);}finally{User.findById=find;}
 });
 test('cash confirmation is allowed only after job completion',async()=>{
- const uf=User.findById,bf=Booking.findById;User.findById=()=>({select:async()=>({_id:'admin',role:'admin'})});const token=jwt.sign({id:'admin'},process.env.JWT_SECRET);let status='confirmed',saved=false;
- Booking.findById=async()=>({status,save:async()=>{saved=true;}});
- try{assert.equal((await request('/api/admin/bookings/1/payment','PUT',{paymentStatus:'paid'},token)).status,400);status='completed';assert.equal((await request('/api/admin/bookings/1/payment','PUT',{paymentStatus:'paid'},token)).status,200);assert.ok(saved);}finally{User.findById=uf;Booking.findById=bf;}
+ const uf=User.findById,bf=Booking.findById,bu=Booking.findOneAndUpdate;User.findById=()=>({select:async()=>({_id:'admin',role:'admin'})});const token=jwt.sign({id:'admin'},process.env.JWT_SECRET);let status='confirmed',saved=false;
+ Booking.findById=async()=>({status,paymentStatus:'pending'});Booking.findOneAndUpdate=async()=>{saved=true;return {paymentStatus:'paid'};};
+ try{assert.equal((await request('/api/admin/bookings/507f1f77bcf86cd799439011/payment','PUT',{paymentStatus:'paid'},token)).status,400);status='completed';assert.equal((await request('/api/admin/bookings/507f1f77bcf86cd799439011/payment','PUT',{paymentStatus:'paid'},token)).status,200);assert.ok(saved);}finally{User.findById=uf;Booking.findById=bf;Booking.findOneAndUpdate=bu;}
 });
 
 
@@ -151,8 +151,8 @@ test('deleted message serialization hides original content and personal visibili
  const Message=require('../dist/models/Message').default;const document=new Message({senderId:'507f1f77bcf86cd799439011',receiverId:'507f1f77bcf86cd799439012',senderName:'Sender',message:'private original',deletedAt:new Date(),hiddenFor:['507f1f77bcf86cd799439011']});for(const value of [document.toJSON(),document.toObject()]){assert.equal(value.message,'');assert.equal(value.hiddenFor,undefined);}
 });
 test('chat pagination is participant-scoped and excludes personally cleared messages',async()=>{
- const {getMessages}=require('../dist/controllers/chatController');const Message=require('../dist/models/Message').default;const find=Message.find,update=Message.updateMany;let query,limit;Message.find=q=>{query=q;return{sort:()=>({limit:async count=>{limit=count;return Array.from({length:51},(_,index)=>({_id:'message-'+index}));}})};};Message.updateMany=async()=>{};
- try{const res=response();await getMessages({user:{id:'507f1f77bcf86cd799439011'},params:{contactId:'507f1f77bcf86cd799439012'},query:{},app:{get:()=>undefined}},res);assert.equal(limit,51);assert.equal(res.body.messages.length,50);assert.equal(res.body.hasMore,true);assert.equal(query.hiddenFor.$ne,'507f1f77bcf86cd799439011');assert.equal(query.$or[0].senderId,'507f1f77bcf86cd799439011');}finally{Message.find=find;Message.updateMany=update;}
+ const {getMessages}=require('../dist/controllers/chatController');const Message=require('../dist/models/Message').default;const find=Message.find,update=Message.updateMany;const exists=User.exists;User.exists=async()=>({_id:'507f1f77bcf86cd799439012'});let query,limit;Message.find=q=>{query=q;return{sort:()=>({limit:async count=>{limit=count;return Array.from({length:51},(_,index)=>({_id:'message-'+index}));}})};};Message.updateMany=async()=>{};
+ try{const res=response();await getMessages({user:{id:'507f1f77bcf86cd799439011',role:'superadmin'},params:{contactId:'507f1f77bcf86cd799439012'},query:{},app:{get:()=>undefined}},res);assert.equal(limit,51);assert.equal(res.body.messages.length,50);assert.equal(res.body.hasMore,true);assert.equal(query.hiddenFor.$ne,'507f1f77bcf86cd799439011');assert.equal(query.$or[0].senderId,'507f1f77bcf86cd799439011');}finally{Message.find=find;Message.updateMany=update;User.exists=exists;}
 });
 
 

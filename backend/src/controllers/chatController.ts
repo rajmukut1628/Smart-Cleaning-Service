@@ -7,13 +7,16 @@ type ChatRequest=Request & {user?:{id:string;name:string;role:string}};
 const valid=(id:unknown)=>typeof id==='string'&&mongoose.isValidObjectId(id);
 const pair=(userId:string,contactId:string)=>({$or:[{senderId:userId,receiverId:contactId},{senderId:contactId,receiverId:userId}]});
 const emitChange=(req:ChatRequest,message:InstanceType<typeof Message>)=>req.app.get('io')?.to('user:'+message.senderId).to('user:'+message.receiverId).emit('messageUpdated',message.toObject());
-export async function getContacts(req:ChatRequest,res:Response){try{
- const user=req.user!;let filter:Record<string,unknown>={_id:{$ne:user.id},role:{$ne:'blocked'}};
- if(!['admin','superadmin'].includes(user.role)){
+export async function contactFilter(user:{id:string;role:string}){
+ const base={_id:{$ne:user.id}};
+ if(['admin','superadmin'].includes(user.role))return {...base,role:{$in:['user','worker','admin','superadmin']}};
  const bookings=await Booking.find(user.role==='user'?{user:user.id}:{$or:[{worker:user.id},{workers:user.id}]}).select('user worker workers').lean();
  const ids=bookings.flatMap(b=>user.role==='user'?[b.worker,...(b.workers||[])]:[b.user]).filter(Boolean);
- filter={_id:{$ne:user.id},role:{$ne:'blocked'},$or:[{role:{$in:['admin','superadmin']}},{_id:{$in:ids}}]};
- }
+ return {...base,$or:[{role:{$in:user.role==='worker'?['superadmin']:['admin','superadmin']}},{_id:{$in:ids},role:user.role==='user'?'worker':'user'}]};
+}
+async function allowedContact(user:{id:string;role:string},contactId:string){return Boolean(await User.exists({$and:[await contactFilter(user),{_id:contactId}]}));}
+export async function getContacts(req:ChatRequest,res:Response){try{
+ const user=req.user!;const filter=await contactFilter(user);
  const people=await User.find(filter).select('name role profilePicture').lean();const actor=new mongoose.Types.ObjectId(user.id);
  const summaries=await Message.aggregate([{$match:{$or:[{senderId:actor},{receiverId:actor}],hiddenFor:{$ne:actor}}},{$sort:{timestamp:-1,_id:-1}},{$group:{_id:{$cond:[{$eq:['$senderId',actor]},'$receiverId','$senderId']},last:{$first:'$$ROOT'},unread:{$sum:{$cond:[{$and:[{$eq:['$receiverId',actor]},{$eq:['$isRead',false]},{$not:[{$ifNull:['$deletedAt',false]}]}]},1,0]}}}}]);
  const byId=new Map(summaries.map(row=>[String(row._id),row]));const rooms=req.app.get('io')?.sockets.adapter.rooms;
@@ -22,6 +25,7 @@ export async function getContacts(req:ChatRequest,res:Response){try{
 export async function getMessages(req:ChatRequest,res:Response){try{
  const userId=req.user!.id,contactId=String(req.params.contactId),before=req.query.before;
  if(!valid(contactId)||(before!==undefined&&!valid(before)))return res.status(400).json({message:'Invalid conversation'});
+ if(!await allowedContact(req.user!,contactId))return res.status(403).json({message:'This contact is not available for your account'});
  const query={...pair(userId,contactId),hiddenFor:{$ne:userId},...(before?{_id:{$lt:before}}:{})};
  const records=await Message.find(query).sort({_id:-1}).limit(51);const hasMore=records.length>50;const messages=records.slice(0,50).reverse();
  await Message.updateMany({senderId:contactId,receiverId:userId,isRead:false,hiddenFor:{$ne:userId}},{$set:{isRead:true}});
@@ -31,6 +35,7 @@ export async function getMessages(req:ChatRequest,res:Response){try{
 export async function sendMessage(req:ChatRequest,res:Response){try{
  const {receiverId,message}=req.body;const user=req.user!;
  if(!valid(receiverId)||receiverId===user.id||typeof message!=='string'||!message.trim()||message.trim().length>4000)return res.status(400).json({message:'Choose a recipient and enter 1–4000 characters'});
+ if(!await allowedContact(user,receiverId))return res.status(403).json({message:'This contact is not available for your account'});
  const receiver=await User.findById(receiverId).select('role');if(!receiver||receiver.role==='blocked')return res.status(404).json({message:'Recipient unavailable'});
  const record=await Message.create({senderId:user.id,senderName:user.name,receiverId,message:message.trim(),isRead:false});
  req.app.get('io')?.to('user:'+receiverId).to('user:'+user.id).emit('chatMessage',record.toObject());res.status(201).json(record);
@@ -53,4 +58,4 @@ export async function hideMessage(req:ChatRequest,res:Response){try{
  }catch{res.status(500).json({message:'Message could not be deleted for you'});}}
 export async function getUnreadCount(req:ChatRequest,res:Response){try{const unreadCount=await Message.countDocuments({receiverId:req.user!.id,isRead:false,hiddenFor:{$ne:req.user!.id},deletedAt:null});res.json({unreadCount});}catch{res.status(500).json({message:'Could not load unread count'});}}
 
-export async function markConversationRead(req:ChatRequest,res:Response){try{const contactId=String(req.params.contactId),userId=req.user!.id;if(!valid(contactId))return res.status(400).json({message:'Invalid conversation'});await Message.updateMany({senderId:contactId,receiverId:userId,hiddenFor:{$ne:userId},isRead:false},{$set:{isRead:true}});req.app.get('io')?.to('user:'+contactId).emit('messagesRead',{readerId:userId});res.json({success:true});}catch{res.status(500).json({message:'Could not mark messages read'});}}
+export async function markConversationRead(req:ChatRequest,res:Response){try{const contactId=String(req.params.contactId),userId=req.user!.id;if(!valid(contactId))return res.status(400).json({message:'Invalid conversation'});if(!await allowedContact(req.user!,contactId))return res.status(403).json({message:'This contact is not available for your account'});await Message.updateMany({senderId:contactId,receiverId:userId,hiddenFor:{$ne:userId},isRead:false},{$set:{isRead:true}});req.app.get('io')?.to('user:'+contactId).emit('messagesRead',{readerId:userId});res.json({success:true});}catch{res.status(500).json({message:'Could not mark messages read'});}}

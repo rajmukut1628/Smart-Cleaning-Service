@@ -1,6 +1,6 @@
 import { getAnalytics } from '../controllers/analyticsController';
 import { getPlatformActivity } from '../controllers/platformActivityController';
-import Booking from '../models/Booking';
+import { updateBookingPayment } from '../controllers/paymentController';
 import { createManagedAccount } from '../controllers/managedAccountController';
 import express from 'express';
 import {
@@ -35,18 +35,7 @@ router.use(protect, admin);
 router.get('/ownership', getOwnership);
 router.post('/ownership/transfer', superAdmin, transferOwnership);
 
-router.put('/bookings/:id/payment', async (req: any, res) => {
-  const { paymentStatus } = req.body;
-  if (!['paid', 'pending'].includes(paymentStatus)) return res.status(400).json({ message: 'Invalid payment status' });
-  const booking = await Booking.findById(req.params.id);
-  if (!booking) return res.status(404).json({ message: 'Booking not found' });
-  if (paymentStatus === 'paid' && booking.status !== 'completed') return res.status(400).json({ message: 'Complete the service before confirming cash payment' });
-  booking.paymentStatus = paymentStatus;
-  booking.paymentConfirmedBy = paymentStatus === 'paid' ? req.user._id : undefined;
-  booking.paymentConfirmedAt = paymentStatus === 'paid' ? new Date() : undefined;
-  await booking.save();
-  res.json(booking);
-});
+router.put('/bookings/:id/payment', updateBookingPayment);
 
 router.route('/stats').get(getAdminStats);
 router.get('/analytics',getAnalytics);

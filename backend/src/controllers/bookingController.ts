@@ -87,8 +87,8 @@ export const getUserBookings = async (req: AuthenticatedRequest, res: Response) 
     const bookings = await Booking.find({ user: req.user._id })
       .populate('user', 'name email phone')
       .populate('service', 'name') // Populate service details
-      .populate('worker', 'name email') // Added: populate primary worker
-      .populate('workers', 'name email') // Added: populate all workers
+      .populate('worker', 'name email phone') // Added: populate primary worker
+      .populate('workers', 'name email phone') // Added: populate all workers
       .sort({ scheduledDate: -1 }); // Sort by most recent
 
     res.json(bookings);

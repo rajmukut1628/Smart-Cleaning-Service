@@ -19,10 +19,10 @@ interface AuthenticatedRequest extends Request {
 export const getAllBookings = async (req: Request, res: Response) => {
   try {
     const bookings = await Booking.find({})
-      .populate('user', 'name email')
+      .populate('user', 'name email phone')
       .populate('service', 'name duration')
-      .populate('worker', 'name')
-      .populate('workers', 'name')
+      .populate('worker', 'name email phone')
+      .populate('workers', 'name email phone')
       .sort({ createdAt: -1 });
     res.json(bookings);
   } catch (error) {
@@ -515,14 +515,14 @@ export const exportData = async (req: AuthenticatedRequest, res: Response) => {
         break;
       case 'bookings':
         data = await Booking.find({})
-          .populate('user', 'name email')
+          .populate('user', 'name email phone')
           .populate('service', 'name');
         filename = 'bookings_export.csv';
         break;
       case 'all':
         const users = await User.find({}).select('-password');
         const bookings = await Booking.find({})
-          .populate('user', 'name email')
+          .populate('user', 'name email phone')
           .populate('service', 'name');
         data = [...users, ...bookings];
         filename = 'all_data_export.csv';
