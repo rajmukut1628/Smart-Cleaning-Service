@@ -72,7 +72,7 @@ export default function Header() {
 
     socket.auth = { token: user.token };
     socket.connect();
-    socket.on('session-revoked', () => { logout(); navigate('/login'); });
+    socket.on('session-revoked', () => logout());
 
     // Listen for new messages to increment unread count
     socket.on('chatMessage', (message: any) => {

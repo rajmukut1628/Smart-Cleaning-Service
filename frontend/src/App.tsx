@@ -79,6 +79,7 @@ function AppContent() {
           <Route path="/forgot-password" element={<ForgotPasswordForm />} />
           <Route path="/login" element={<LoginForm onSwitchPage={() => navigate('/register')} />} />
           <Route path="/register" element={<RegistrationForm onSwitchPage={() => navigate('/login')} />} />
+          {['/home', '/management', '/admin-dashboard', '/analytics', '/bookings-management', '/workers-management', '/services-management', '/user-dashboard', '/bookings', '/worker-dashboard', '/jobs', '/earnings', '/performance', '/settings', '/profile', '/chat', '/cleaning-tips'].map(path => <Route key={path} path={path} element={<Navigate to="/" replace />} />)}
           <Route path="*" element={<><PublicHeader /><NotFoundPage /></>} />
         </Routes>
         {location.pathname !== '/chat' && <WhatsAppButton />}

@@ -1,5 +1,6 @@
+import { useNavigate } from 'react-router-dom';
 import { imageUrl } from '../utils/imageUrl';
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { User } from '../types';
 import { API_BASE_URL } from '../config/apiConfig';
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_URL = `${API_BASE_URL}/api`;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -99,17 +101,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await axios.post(API_URL + '/auth/register/verify', { verificationId, code });
     establishSession(data);
   };
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     localStorage.removeItem('bd-clean-user');
     delete axios.defaults.headers.common['Authorization'];
-  };
+    navigate('/', { replace: true });
+  }, [navigate]);
 
   useEffect(() => {
-    const expire = () => { setUser(null); localStorage.removeItem('bd-clean-user'); delete axios.defaults.headers.common.Authorization; };
+    const expire = () => logout();
     window.addEventListener('session-expired', expire);
     return () => window.removeEventListener('session-expired', expire);
-  }, []);
+  }, [logout]);
 
   const updateUserProfile = (userData: Partial<AuthenticatedUser>) => {
     if (user) {
