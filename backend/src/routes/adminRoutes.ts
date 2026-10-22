@@ -26,7 +26,7 @@ import {
   deleteUser,
 } from '../controllers/adminController';
 import { protect, admin, superAdmin } from '../middleware/authMiddleware';
-import { getOwnership, transferOwnership } from '../controllers/ownershipController';
+import { getOwnership, transferOwnership, deleteAdministratorAccount } from '../controllers/ownershipController';
 
 const router = express.Router();
 
@@ -59,6 +59,7 @@ router.route('/bookings/:id/assign').put(assignWorkerToBooking);
 
 // Admin management routes
 router.route('/admins').get(getAllAdmins).post(superAdmin, createAdmin);
+router.delete('/admins/:id/account', superAdmin, deleteAdministratorAccount);
 router.route('/admins/:id').put(superAdmin, updateAdmin).delete(superAdmin, deleteAdmin);
 
 // Bulk operations routes

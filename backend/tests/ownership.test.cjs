@@ -82,3 +82,36 @@ test('rerunning bootstrap keeps the transferred owner and never reclaims the def
   mock(User, 'updateOne', async filter => { firstUpdate = filter; }); mock(User, 'updateMany', async () => ({}));
   const result = await security.ensurePlatformOwner(); assert.equal(result.ownerId, targetId); assert.equal(firstUpdate._id, targetId); assert.equal(lookedUpBootstrap, false);
 }));
+
+test('owner-only account deletion refuses self-deletion, other administrators and incorrect owner passwords', async () => mocked(async mock => {
+ const password=await bcrypt.hash('test-owner-password',8);let writes=0;
+ mock(User,'findById',()=>({select:async()=>({password,authProvider:'local'})}));mock(User,'deleteOne',async()=>{writes++;});
+ let req=request(state()),res=response();req.params.id=ownerId;await controller.deleteAdministratorAccount(req,res);assert.equal(res.code,400);
+ req=request({...state(),ownerId:targetId});req.params.id='507f1f77bcf86cd799439013';res=response();await controller.deleteAdministratorAccount(req,res);assert.equal(res.code,403);
+ req=request(state());req.body.password='wrong-password';res=response();await controller.deleteAdministratorAccount(req,res);assert.equal(res.code,400);assert.equal(writes,0);
+}));
+test('administrator account deletion atomically removes credentials, records an audit event and disconnects the target', async () => mocked(async mock => {
+ const mongoose=require('mongoose');const password=await bcrypt.hash('test-owner-password',8);let deleted,authority,disconnected=false,ended=false;
+ const session={withTransaction:async fn=>fn(),endSession:async()=>{ended=true;}};
+ mock(mongoose,'startSession',async()=>session);
+ mock(User,'findById',id=>String(id)===ownerId?{select:async()=>({password,authProvider:'local'})}:{session:async()=>({_id:targetId,name:'Admin',email:'admin@example.test',role:'admin'})});
+ mock(Platform,'findOneAndUpdate',async(filter,update,options)=>{assert.equal(options.session,session);authority={filter,update};return state();});
+ mock(User,'deleteOne',async(filter,options)=>{assert.equal(options.session,session);deleted=filter;return{deletedCount:1};});
+ const req=request(state());req.app={get:()=>({to:()=>({emit:()=>{}}),in:()=>({disconnectSockets:()=>{disconnected=true;}})})};
+ const res=response();await controller.deleteAdministratorAccount(req,res);assert.equal(res.code,200);assert.equal(deleted._id,targetId);assert.ok(deleted.role.$in.includes('admin'));assert.equal(authority.filter.ownerId,ownerId);assert.equal(authority.filter.revision,0);assert.equal(authority.update.$push.history.$each[0].action,'admin_deleted');assert.equal(authority.update.$addToSet.revokedAdminIds,targetId);assert.ok(disconnected&&ended);
+}));
+test('administrator deletion rejects wrong email, customer accounts and concurrent ownership changes', async () => mocked(async mock => {
+ const mongoose=require('mongoose');const password=await bcrypt.hash('test-owner-password',8);let deletes=0,targetRole='admin',stale=false;
+ mock(mongoose,'startSession',async()=>({withTransaction:async fn=>fn(),endSession:async()=>{}}));
+ mock(User,'findById',id=>String(id)===ownerId?{select:async()=>({password,authProvider:'local'})}:{session:async()=>({_id:targetId,email:'admin@example.test',role:targetRole})});
+ mock(Platform,'findOneAndUpdate',async()=>stale?null:state());mock(User,'deleteOne',async()=>{deletes++;return{deletedCount:1};});
+ let req=request(state());req.body.confirmEmail='different@example.test';let res=response();await controller.deleteAdministratorAccount(req,res);assert.equal(res.code,400);
+ targetRole='user';res=response();await controller.deleteAdministratorAccount(request(state()),res);assert.equal(res.code,404);
+ targetRole='admin';stale=true;res=response();await controller.deleteAdministratorAccount(request(state()),res);assert.equal(res.code,409);assert.equal(deletes,0);
+}));
+test('a failed account delete aborts the ownership transaction and never reports success', async () => mocked(async mock => {
+ const mongoose=require('mongoose');const password=await bcrypt.hash('test-owner-password',8);let aborted=false,closed=false;
+ mock(mongoose,'startSession',async()=>({withTransaction:async fn=>{try{await fn();}catch(error){aborted=true;throw error;}},endSession:async()=>{closed=true;}}));
+ mock(User,'findById',id=>String(id)===ownerId?{select:async()=>({password,authProvider:'local'})}:{session:async()=>({_id:targetId,email:'admin@example.test',role:'admin'})});mock(Platform,'findOneAndUpdate',async()=>state());mock(User,'deleteOne',async()=>{throw Error('write failure');});
+ const res=response();await controller.deleteAdministratorAccount(request(state()),res);assert.equal(res.code,500);assert.ok(aborted&&closed);
+}));

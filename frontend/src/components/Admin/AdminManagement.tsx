@@ -3,7 +3,7 @@ import { notifyManagementUpdated } from './managementEvents';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { User } from '../../types';
-import { XMarkIcon, PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PencilIcon, TrashIcon, PlusIcon, ShieldExclamationIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 interface AdminFormData {
@@ -16,6 +16,7 @@ interface AdminFormData {
 }
 
 export default function AdminManagement() {
+  const [deletion, setDeletion] = useState<User | null>(null);
   const [removal, setRemoval] = useState<User | null>(null);
   const [admins, setAdmins] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -192,11 +193,12 @@ export default function AdminManagement() {
                     <PencilIcon className="h-5 w-5" />
                   </button>
                   <button
-                    disabled={currentUserRole !== 'superadmin' || admin.role === 'superadmin'} aria-label={'Remove administrator access for ' + admin.name} onClick={() => handleDelete(admin.id)}
+                    disabled={currentUserRole !== 'superadmin' || admin.role === 'superadmin'} title="Remove admin access" aria-label={'Remove administrator access for ' + admin.name} onClick={() => handleDelete(admin.id)}
                     className="text-red-600 hover:text-red-900"
                   >
-                    <TrashIcon className="h-5 w-5" />
+                    <ShieldExclamationIcon className="h-5 w-5" />
                   </button>
+                  <button type="button" title="Delete administrator account" aria-label={'Delete administrator ' + admin.name} disabled={currentUserRole !== 'superadmin' || admin.role === 'superadmin'} onClick={() => setDeletion(admin)} className="text-red-600 hover:text-red-900 disabled:opacity-30"><TrashIcon className="h-5 w-5" /></button>
                 </td>
               </tr>
             ))}
@@ -204,6 +206,7 @@ export default function AdminManagement() {
         </table>
       </div>
 
+      {deletion && <OwnershipAction mode="delete" target={{ _id: deletion.id, name: deletion.name, email: deletion.email }} onClose={() => setDeletion(null)} onDone={() => { setDeletion(null); void fetchAdmins(); toast.success('Administrator account deleted'); }} />}
       {removal && <OwnershipAction mode="remove" target={{ _id: removal.id, name: removal.name, email: removal.email }} onClose={() => setRemoval(null)} onDone={() => { setRemoval(null); fetchAdmins(); notifyManagementUpdated(); toast.success('Administrator access removed'); }} />}
       {/* Modal */}
       {showModal && (

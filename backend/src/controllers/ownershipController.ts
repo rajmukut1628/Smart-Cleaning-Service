@@ -75,3 +75,31 @@ export async function removeAdministrator(req: OwnerRequest, res: Response) {
     return res.json({ message: 'Administrator access removed and previous sessions revoked.' });
   } catch (error) { return actionError(res, error); }
 }
+
+// Permanent account deletion is distinct from removing administrator privileges.
+export async function deleteAdministratorAccount(req: OwnerRequest, res: Response) {
+  let transaction: mongoose.ClientSession | undefined;
+  try {
+    const id = String(req.params.id);
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: 'Invalid administrator.' });
+    if (id === String(req.ownership?.ownerId) || id === String(req.user?._id)) return res.status(400).json({ message: 'The current owner cannot be deleted. Transfer ownership first.' });
+    await proveOwner(req);
+    transaction = await mongoose.startSession();
+    await transaction.withTransaction(async () => {
+      const target = await User.findById(id).session(transaction!);
+      if (!target || !['admin', 'superadmin'].includes(target.role)) throw Object.assign(new Error('Administrator not found.'), { status: 404 });
+      if (typeof req.body.confirmEmail !== 'string' || req.body.confirmEmail.trim().toLowerCase() !== target.email.toLowerCase()) throw Object.assign(new Error('Type this administrator’s full email to confirm deletion.'), { status: 400 });
+      const state = await PlatformOwnership.findOneAndUpdate({ _id: 'platform', ownerId: req.user._id, revision: req.ownership.revision }, {
+        $inc: { revision: 1, ['accessVersions.' + id]: 1 },
+        $addToSet: { revokedAdminIds: target._id },
+        $push: { history: { $each: [{ action: 'admin_deleted', actorId: req.user._id, actorName: req.user.name, targetId: target._id, targetName: target.name, targetEmail: target.email, at: new Date() }], $slice: -100 } },
+      }, { new: true, session: transaction });
+      if (!state) throw Object.assign(new Error('Ownership details changed. Refresh and try again.'), { status: 409 });
+      const removed = await User.deleteOne({ _id: target._id, role: { $in: ['admin', 'superadmin'] } }, { session: transaction });
+      if (removed.deletedCount !== 1) throw Object.assign(new Error('The account changed during deletion. Refresh and try again.'), { status: 409 });
+    });
+    endSessions(req, [id]);
+    return res.json({ message: 'Administrator account deleted and previous sessions revoked.' });
+  } catch (error) { return actionError(res, error); }
+  finally { await transaction?.endSession(); }
+}

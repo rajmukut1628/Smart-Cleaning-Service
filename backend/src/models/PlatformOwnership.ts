@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 const event = new mongoose.Schema({
-  action: { type: String, enum: ['initialized', 'transferred', 'admin_removed'], required: true },
+  action: { type: String, enum: ['initialized', 'transferred', 'admin_removed', 'admin_deleted'], required: true },
   actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, actorName: String,
   targetId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, targetName: String, targetEmail: String,
   previousOwnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

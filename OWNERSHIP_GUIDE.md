@@ -63,3 +63,11 @@ node dist/scripts/setupRequestedOwner.js && node dist/server.js
 Deploy the latest commit. Successful setup logs only the status and target email, never the password. Sign in with the new owner's email and the specified password. Restore `npm run start:prod` as the Start Command and remove the three OWNER_SETUP variables afterward. Existing bootstrap OWNER_EMAIL values do not reclaim ownership on subsequent restarts.
 
 If the current Owner is a different account, or the target is blocked or Google-only, the command refuses the change for manual review. Automated tests use mock accounts and do not demonstrate a completed live migration.
+
+## Delete an administrator account
+
+The current Owner can use **Management > People > Delete admin**, or the delete icon in **Ownership & access**. Deletion requires typing the selected administrator email and the current Owner password. The Owner cannot delete their own account, and ordinary administrators cannot delete other administrators.
+
+`DELETE /api/admin/admins/:id/account` permanently deletes the administrator User document, revokes their access, disconnects their sessions, and records an `admin_deleted` audit event. Historical bookings and activity records are retained. The existing remove-access operation remains separate and converts the administrator to a customer instead of deleting the account.
+
+Account deletion and its ownership audit update commit in a MongoDB transaction. Use MongoDB Atlas or a transaction-capable replica set for this operation. Deploy both backend and frontend to enable the button and API together. Automated and browser checks use mock accounts and do not delete real administrators.
