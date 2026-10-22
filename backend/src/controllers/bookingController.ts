@@ -1,3 +1,4 @@
+import { isUploadedImage } from '../utils/imageStorage';
 import { Request, Response } from 'express';
 import Booking from '../models/Booking';
 import Service from '../models/Service'; // Needed to calculate price
@@ -104,7 +105,7 @@ export const uploadBeforeImages = async (req: AuthenticatedRequest, res: Respons
   try {
     const { id } = req.params;
     const { images } = req.body; // Array of image URLs
-    if (!Array.isArray(images) || images.length > 20 || images.some(image => typeof image !== 'string' || !image.startsWith('/uploads/'))) return res.status(400).json({ message: 'Provide up to 20 uploaded image paths' });
+    if (!Array.isArray(images) || images.length > 20 || images.some(image => !isUploadedImage(image))) return res.status(400).json({ message: 'Provide up to 20 uploaded image paths' });
 
     const booking = await Booking.findById(id);
     if (!booking) {
@@ -138,7 +139,7 @@ export const uploadAfterImages = async (req: AuthenticatedRequest, res: Response
   try {
     const { id } = req.params;
     const { images } = req.body; // Array of image URLs
-    if (!Array.isArray(images) || images.length > 20 || images.some(image => typeof image !== 'string' || !image.startsWith('/uploads/'))) return res.status(400).json({ message: 'Provide up to 20 uploaded image paths' });
+    if (!Array.isArray(images) || images.length > 20 || images.some(image => !isUploadedImage(image))) return res.status(400).json({ message: 'Provide up to 20 uploaded image paths' });
 
     const booking = await Booking.findById(id);
     if (!booking) {

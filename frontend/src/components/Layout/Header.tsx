@@ -72,6 +72,7 @@ export default function Header() {
 
     socket.auth = { token: user.token };
     socket.connect();
+    socket.on('session-revoked', () => { logout(); navigate('/login'); });
 
     // Listen for new messages to increment unread count
     socket.on('chatMessage', (message: any) => {
@@ -94,6 +95,7 @@ export default function Header() {
 
     return () => {
       socket?.off('chatMessage');
+      socket?.off('session-revoked');
       socket?.off('connect');
       socket?.off('disconnect');
       socket?.disconnect();

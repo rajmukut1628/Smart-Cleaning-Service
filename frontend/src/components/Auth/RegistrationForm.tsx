@@ -1,15 +1,18 @@
 import axios from 'axios';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import GoogleIdentityButton from './GoogleIdentityButton';
+import AuthFrame from './AuthFrame';
+import { ArrowRight, MailCheck, RotateCw } from 'lucide-react';
 
 interface RegistrationFormProps {
   onSwitchPage: () => void;
 }
 
 export default function RegistrationForm({ onSwitchPage }: RegistrationFormProps) {
-  const { register } = useAuth();
+  const { register, verifyRegistration } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,161 +20,54 @@ export default function RegistrationForm({ onSwitchPage }: RegistrationFormProps
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pending, setPending] = useState<{ verificationId: string; email: string } | null>(null);
+  const [code, setCode] = useState('');
+  const [resendWait, setResendWait] = useState(0);
+  const messageFor = (error: unknown) => axios.isAxiosError(error) ? error.response?.data?.message || 'Please try again.' : error instanceof Error ? error.message : 'Please try again.';
+  useEffect(() => { if (resendWait <= 0) return; const timer = window.setTimeout(() => setResendWait(value => Math.max(0, value - 1)), 1000); return () => window.clearTimeout(timer); }, [resendWait]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    try {
-      await register(name, email, password, phone);
-      toast.success('Account created successfully. Please sign in to continue.');
-      onSwitchPage();
-      setIsLoading(false);
-    } catch (error: unknown) {
-      setIsLoading(false);
-      const errorMessage = axios.isAxiosError(error) ? error.response?.data?.message || 'Registration failed. Please try again.' : 'Registration failed. Please try again.';
-      setError(errorMessage);
-      toast.error(errorMessage, {
-        duration: 4000,
-        icon: '⚠️',
-      });
-    }
+  const signUpWithGoogle = async (credential: string) => {
+    await axios.post('/api/auth/google/register', { credential });
+    toast.success('Google account registered. Please sign in with Continue with Google.');
+    onSwitchPage();
   };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); setIsLoading(true); setError('');
+    try {
+      const result = await register(name, email, password, phone);
+      setPending({ verificationId: result.verificationId, email: result.email }); setResendWait(result.retryAfter || 60); setPassword('');
+      toast.success('Verification code sent. Please check your email.');
+    } catch (error) { const text = messageFor(error); setError(text); toast.error(text); }
+    finally { setIsLoading(false); }
+  };
+  const verifyCode = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!pending) return; setIsLoading(true); setError('');
+    try { await verifyRegistration(pending.verificationId, code); toast.success('email verified. You are now signed in.'); }
+    catch (error) { setError(messageFor(error)); }
+    finally { setIsLoading(false); }
+  };
+  const resendCode = async () => {
+    if (!pending || resendWait > 0) return; setIsLoading(true); setError('');
+    try { const { data } = await axios.post('/api/auth/register/resend', { verificationId: pending.verificationId }); setResendWait(data.retryAfter || 60); setCode(''); toast.success('A new verification code was sent.'); }
+    catch (error) { setError(messageFor(error)); if (axios.isAxiosError(error) && error.response?.data?.retryAfter) setResendWait(error.response.data.retryAfter); }
+    finally { setIsLoading(false); }
+  };
+  if (pending) return <AuthFrame register><header className="auth-form-heading"><span>Check your inbox</span><h2>Verify your email.</h2><p>One last step before your account is ready.</p></header><div className="auth-email-notice"><MailCheck size={24}/><div><strong>We sent a verification code to</strong><span>{pending.email}</span></div></div><form className="auth-fields" onSubmit={verifyCode}><label className="auth-field auth-code-field" htmlFor="verification-code"><span>Six-digit verification code</span><input autoFocus id="verification-code" name="verificationCode" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" aria-describedby="verification-expiry" /></label><p id="verification-expiry" className="auth-code-help">Your code expires in 10 minutes. Check Spam if it hasn't arrived.</p>{error && <div role="alert" className="auth-error">{error}</div>}<button className="auth-submit" type="submit" disabled={isLoading || code.length !== 6}>{isLoading ? 'Please wait...' : 'Verify & sign in'}<ArrowRight size={15}/></button></form><div className="auth-code-actions"><button type="button" onClick={resendCode} disabled={isLoading || resendWait > 0}><RotateCw size={12}/>{resendWait > 0 ? 'Resend in ' + resendWait + 's' : 'Resend code'}</button><button type="button" disabled={isLoading} onClick={() => { setPending(null); setCode(''); setError(''); }}>Change details</button></div><p className="auth-google-hint">Verification signs you in automatically. Next time, use your email and chosen password.</p><p className="auth-switch">Already verified?<button type="button" onClick={onSwitchPage}>Sign in</button></p></AuthFrame>;
 
-
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-50 to-blue-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-blue-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">BC</span>
-          </div>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Create your Account
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Join Smart Cleaning Service today
-          </p>
-        </div>
-
-        <div className="bg-white py-8 px-6 shadow-xl rounded-xl border border-gray-100">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Full Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                autoComplete="name"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your full name"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your email"
-              />
-            </div>
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                Phone Number
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                autoComplete="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your phone number"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="mt-1 relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  minLength={8}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Create a password"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? 'Creating Account...' : 'Create Account'}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6 text-center">
-
-            <p className="text-sm text-gray-600">
-              Already have an account?{' '}
-              <button
-                onClick={onSwitchPage}
-                className="font-medium text-blue-600 hover:text-blue-500 focus:outline-none"
-              >
-                Sign In
-              </button>
-            </p>
-          </div>
-
-        </div>
+  return <AuthFrame register>
+    <header className="auth-form-heading"><span>A fresh start</span><h2>Create your account.</h2><p>A little less effort. A beautifully cared-for space.</p></header>
+    <form className="auth-fields" onSubmit={handleSubmit}>
+      <div className="auth-two-col">
+        <label className="auth-field" htmlFor="name"><span>Full name</span><input id="name" name="name" type="text" autoComplete="name" required value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></label>
+        <label className="auth-field" htmlFor="phone"><span>Phone number</span><input id="phone" name="phone" type="tel" autoComplete="tel" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="01XXXXXXXXX" /></label>
       </div>
-    </div>
-  );
+      <label className="auth-field" htmlFor="email"><span>email address</span><input id="email" name="email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label>
+      <label className="auth-field" htmlFor="password"><span>Password</span><div className="auth-password"><input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={8} required value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlashIcon /> : <EyeIcon />}</button></div></label>
+      {error && <div role="alert" className="auth-error">{error}</div>}
+      <button type="submit" disabled={isLoading} className="auth-submit">{isLoading ? 'Creating account...' : 'Sign up'}<ArrowRight size={15} /></button>
+    </form>
+    <p className="auth-switch">Already have an account?<button type="button" onClick={onSwitchPage}>Sign in</button></p>
+    <div className="auth-divider">or sign up with Google</div>
+    <div className="auth-google-zone"><GoogleIdentityButton mode="register" onCredential={signUpWithGoogle} /><p className="auth-google-hint">Google sign-up creates a Google-only account. No password needed.</p></div>
+  </AuthFrame>;
 }
-

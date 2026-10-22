@@ -1,9 +1,9 @@
+import { imageUrl } from '../../utils/imageUrl';
 import { useAuth } from '../../context/AuthContext';
 import { useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { XMarkIcon, CalendarIcon, ClockIcon, MapPinIcon, UserIcon, InboxIcon, Squares2X2Icon, ChatBubbleBottomCenterTextIcon, PhotoIcon } from '@heroicons/react/24/outline';
-import { API_BASE_URL } from '../../config/apiConfig';
 
 interface BookingDetailsModalProps {
     booking: any;
@@ -250,10 +250,10 @@ export default function BookingDetailsModal({ booking, onClose }: BookingDetails
                                                 {booking.beforeImages.map((img: string, idx: number) => (
                                                     <img
                                                         key={idx}
-                                                        src={`${API_BASE_URL}${img}`}
+                                                        src={imageUrl(img)}
                                                         alt="Before"
                                                         className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:scale-105 transition-transform cursor-pointer"
-                                                        onClick={() => window.open(`${API_BASE_URL}${img}`, '_blank')}
+                                                        onClick={() => window.open(imageUrl(img), '_blank')}
                                                     />
                                                 ))}
                                             </div>
@@ -270,10 +270,10 @@ export default function BookingDetailsModal({ booking, onClose }: BookingDetails
                                                 {booking.afterImages.map((img: string, idx: number) => (
                                                     <img
                                                         key={idx}
-                                                        src={`${API_BASE_URL}${img}`}
+                                                        src={imageUrl(img)}
                                                         alt="After"
                                                         className="w-full h-32 object-cover rounded-lg border border-blue-200 hover:scale-105 transition-transform cursor-pointer"
-                                                        onClick={() => window.open(`${API_BASE_URL}${img}`, '_blank')}
+                                                        onClick={() => window.open(imageUrl(img), '_blank')}
                                                     />
                                                 ))}
                                             </div>

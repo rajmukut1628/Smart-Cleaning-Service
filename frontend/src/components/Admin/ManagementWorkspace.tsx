@@ -15,7 +15,7 @@ const modules = [
   { id: 'users', label: 'People', detail: 'Accounts & roles', icon: Users, component: UserManagement },
   { id: 'workers', label: 'Workforce', detail: 'Profiles & verification', icon: Briefcase, component: WorkerManagement },
   { id: 'services', label: 'Service catalog', detail: 'Services & pricing', icon: Sparkles, component: ServiceManagement },
-  { id: 'admins', label: 'Administrators', detail: 'Access & permissions', icon: ShieldCheck, component: AdminManagement },
+  { id: 'admins', label: 'Ownership & access', detail: 'Owner & administrators', icon: ShieldCheck, component: AdminManagement },
   { id: 'units', label: 'Measurement units', detail: 'Booking configuration', icon: Layers3, component: UnitManagement },
   { id: 'bulk', label: 'Bulk actions', detail: 'Manage records together', icon: Wand2, component: BulkOperations },
 ] as const;

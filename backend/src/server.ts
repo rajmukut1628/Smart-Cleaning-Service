@@ -18,15 +18,17 @@ import profileRoutes from './routes/profileRoutes';
 import chatRoutes from './routes/chatRoutes';
 import customServiceRoutes from './routes/customServiceRoutes';
 import path from 'path';
+import { ensurePlatformOwner } from './security/ownership';
 
 import { createServer } from 'http'; // Import createServer
 import { Server as SocketIOServer } from 'socket.io'; // Import SocketIOServer
 
 dotenv.config();
 
-connectDB();
+const databaseReady = connectDB().then(() => ensurePlatformOwner());
 
 const app = express();
+if (process.env.RENDER) app.set('trust proxy', 1);
 const httpServer = createServer(app); // Create HTTP server from app
 const io = new SocketIOServer(httpServer, { // Attach Socket.IO to HTTP server
   cors: {
@@ -79,4 +81,4 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 
 const PORT = process.env.PORT || 5003;
 
-httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`)); // Listen with httpServer
+databaseReady.then(() => httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`))).catch(() => { console.error('Platform ownership setup failed. Check the owner account configuration.'); process.exit(1); });

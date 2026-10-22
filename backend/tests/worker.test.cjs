@@ -1,3 +1,4 @@
+require('./helpers/ownership.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const Booking=require('../dist/models/Booking').default;

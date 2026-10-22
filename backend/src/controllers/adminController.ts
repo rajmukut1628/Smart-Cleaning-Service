@@ -1,3 +1,5 @@
+import { effectiveRole } from '../security/ownership';
+import { removeAdministrator } from './ownershipController';
 import ActivityLog from '../models/ActivityLog';
 import { Request, Response } from 'express';
 import Booking from '../models/Booking';
@@ -8,6 +10,7 @@ import bcrypt from 'bcryptjs';
 // Extend Express Request interface to include user property
 interface AuthenticatedRequest extends Request {
   user?: any;
+  ownership?: any;
 }
 
 // @desc    Get all bookings
@@ -31,13 +34,13 @@ export const getAllBookings = async (req: Request, res: Response) => {
 // @desc    Get all users (or filter by role)
 // @route   GET /api/admin/users
 // @access  Private/Admin
-export const getAllUsers = async (req: Request, res: Response) => {
+export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
   const { role } = req.query;
   const filter = role ? { role } : {};
 
   try {
     const users = await User.find(filter).select('-password');
-    res.json(users);
+    res.json(users.map(user => ({ ...(user.toObject ? user.toObject() : user), role: effectiveRole(user, req.ownership) })));
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
@@ -226,10 +229,10 @@ export const createBookingByAdmin = async (req: Request, res: Response) => {
 // @desc    Get all admins
 // @route   GET /api/admin/admins
 // @access  Private/Admin
-export const getAllAdmins = async (req: Request, res: Response) => {
+export const getAllAdmins = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const admins = await User.find({ role: { $in: ['admin', 'superadmin'] } }).select('-password');
-    res.json(admins);
+    res.json(admins.map(user => ({ ...(user.toObject ? user.toObject() : user), role: effectiveRole(user, req.ownership) })).filter(user => ['admin','superadmin'].includes(user.role)));
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
@@ -240,10 +243,11 @@ export const getAllAdmins = async (req: Request, res: Response) => {
 // @route   POST /api/admin/admins
 // @access  Private/Admin
 export const createAdmin = async (req: Request, res: Response) => {
-  const { name, email, password, phone, address } = req.body;
+  const { name, password, phone, address } = req.body;
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
 
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: 'Please provide name, email, and password' });
+  if (typeof name !== 'string' || !name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || typeof phone !== 'string' || !phone.trim() || typeof password !== 'string' || password.length < 12 || Buffer.byteLength(password) > 72) {
+    return res.status(400).json({ message: 'Provide name, valid email, phone and an administrator password of at least 12 characters (up to 72 bytes).' });
   }
 
   try {
@@ -292,6 +296,7 @@ export const updateAdmin = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    if (role && role !== user.role) return res.status(400).json({ message: 'Use Ownership & Access to remove an administrator. Ownership can only be transferred.' });
     // Prevent changing own role to non-admin
     if (req.user && req.user._id.toString() === id && role && role !== req.user.role) {
       return res.status(400).json({ message: 'Cannot change your own administrator role' });
@@ -322,29 +327,7 @@ export const updateAdmin = async (req: AuthenticatedRequest, res: Response) => {
 // @desc    Delete admin (change role to user)
 // @route   DELETE /api/admin/admins/:id
 // @access  Private/Admin
-export const deleteAdmin = async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params;
-
-  try {
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Prevent deleting self
-    if (req.user && req.user._id.toString() === id) {
-      return res.status(400).json({ message: 'Cannot delete your own account' });
-    }
-
-    user.role = 'user'; // Change to user instead of deleting
-    await user.save();
-
-    res.json({ message: 'Admin role removed' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
-};
+export const deleteAdmin = removeAdministrator;
 
 // @desc    Bulk update booking status
 // @route   PUT /api/admin/bookings/bulk-update
@@ -417,7 +400,7 @@ export const bulkDeleteUsers = async (req: AuthenticatedRequest, res: Response) 
     // Filter out admin users - don't delete them
     const users = await User.find({ _id: { $in: userIds } });
     const nonAdminUserIds = users
-      .filter(u => u.role !== 'admin')
+      .filter(u => !['admin','superadmin'].includes(u.role) && String(u._id) !== String(req.ownership?.ownerId))
       .map(u => u._id);
 
     if (nonAdminUserIds.length === 0) {
@@ -450,7 +433,7 @@ export const bulkBlockUsers = async (req: AuthenticatedRequest, res: Response) =
     // Filter out admin users - don't block/unblock them
     const users = await User.find({ _id: { $in: userIds } });
     const nonAdminUserIds = users
-      .filter(u => u.role !== 'admin')
+      .filter(u => !['admin','superadmin'].includes(u.role) && String(u._id) !== String(req.ownership?.ownerId))
       .map(u => u._id);
 
     if (nonAdminUserIds.length === 0) {
@@ -616,7 +599,7 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response) =
   const { id } = req.params;
   const { role } = req.body;
 
-  const validRoles = ['user', 'worker', 'admin', 'superadmin', 'blocked'];
+  const validRoles = ['user', 'worker', 'admin', 'blocked'];
   if (!role || !validRoles.includes(role)) {
     return res.status(400).json({ message: 'Invalid role' });
   }
@@ -628,6 +611,9 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response) =
       return res.status(404).json({ message: 'User not found' });
     }
 
+    if (String(req.ownership?.ownerId) === String(user._id) || ['admin','superadmin'].includes(user.role)) return res.status(403).json({ message: 'Use Ownership & Access for administrator changes. The owner must transfer ownership before leaving.' });
+    if (role === 'admin' && user.authProvider === 'google') return res.status(400).json({ message: 'Administrators must have password accounts.' });
+    if (role === 'admin' && req.ownership?.revokedAdminIds?.some((id:any)=>String(id)===String(user._id))) return res.status(400).json({ message: 'This administrator access was revoked. Use a new dedicated administrator account.' });
     // Role protection logic
     // 1. Only superadmin can use this endpoint (enforced by middleware)
     // 2. Prevent a superadmin from demoting themselves (to avoid losing access)
@@ -636,6 +622,7 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response) =
     }
 
     user.role = role;
+    user.sessionVersion = (user.sessionVersion || 0) + 1;
     await user.save();
 
     res.json({
@@ -667,7 +654,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Protect admins/superadmins from being deleted via this endpoint
-    if (['admin', 'superadmin'].includes(user.role)) {
+    if (['admin', 'superadmin'].includes(user.role) || String(req.ownership?.ownerId) === String(user._id)) {
       return res.status(403).json({ message: 'Cannot delete an admin/superadmin user' });
     }
 

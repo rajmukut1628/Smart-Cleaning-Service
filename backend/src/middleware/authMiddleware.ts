@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
+import { validateSession } from '../security/ownership';
 
 // Extend Express Request interface to include user property
 interface AuthenticatedRequest extends Request {
   user?: any;
+  ownership?: any;
 }
 
 export const protect = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -25,7 +27,9 @@ export const protect = async (req: AuthenticatedRequest, res: Response, next: Ne
         return res.status(401).json({ message: 'User not found' });
       }
 
-      // Attach user to request
+      const access = await validateSession(decoded, user);
+      req.ownership = access.ownership;
+      user.role = access.role as typeof user.role;
       req.user = user;
       next();
     } catch (error: any) {
@@ -46,7 +50,7 @@ export const admin = (req: AuthenticatedRequest, res: Response, next: NextFuncti
 };
 
 export const superAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  if (req.user && req.user.role === 'superadmin') {
+  if (req.user && req.ownership && String(req.ownership.ownerId) === String(req.user._id)) {
     next();
   } else {
     res.status(403).json({ message: 'Not authorized as a super admin' });

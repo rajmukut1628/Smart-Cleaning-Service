@@ -3,6 +3,7 @@ import ActivityLog from '../models/ActivityLog';
 // Explicit allowlist: no chat, request bodies, credentials, or personal profile values.
 export function describeActivity(method:string,path:string) {
  const rules:[string,RegExp,string,string][]=[
+ ['POST',/^\/api\/admin\/ownership\/transfer$/,'Platform ownership transferred','administration'],
  ['POST',/^\/api\/services\/custom$/,'Custom service created','service'],
  ['PUT',/^\/api\/services\/custom\/[^/]+$/,'Custom service updated','service'],
  ['DELETE',/^\/api\/services\/custom\/[^/]+$/,'Custom service removed','service'],

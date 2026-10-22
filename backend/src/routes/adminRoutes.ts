@@ -26,11 +26,14 @@ import {
   deleteUser,
 } from '../controllers/adminController';
 import { protect, admin, superAdmin } from '../middleware/authMiddleware';
+import { getOwnership, transferOwnership } from '../controllers/ownershipController';
 
 const router = express.Router();
 
 // All routes in this file are protected and for admins only
 router.use(protect, admin);
+router.get('/ownership', getOwnership);
+router.post('/ownership/transfer', superAdmin, transferOwnership);
 
 router.put('/bookings/:id/payment', async (req: any, res) => {
   const { paymentStatus } = req.body;

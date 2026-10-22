@@ -1,3 +1,5 @@
+import OwnershipAccess, { OwnershipAction } from './OwnershipAccess';
+import { notifyManagementUpdated } from './managementEvents';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { User } from '../../types';
@@ -14,6 +16,7 @@ interface AdminFormData {
 }
 
 export default function AdminManagement() {
+  const [removal, setRemoval] = useState<User | null>(null);
   const [admins, setAdmins] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -100,18 +103,13 @@ export default function AdminManagement() {
           address: formData.address,
         });
 
-        // If role was changed, use the specialized endpoint
-        if (editingAdmin.role !== formData.role && currentUserRole === 'superadmin') {
-          await axios.put(`/api/admin/users/${editingAdmin.id}/role`, {
-            role: formData.role
-          });
-        }
         toast.success('Admin updated successfully');
       } else {
         await axios.post('/api/admin/admins', formData);
         toast.success('Admin created successfully');
       }
       setShowModal(false);
+      notifyManagementUpdated();
       fetchAdmins();
     } catch (error: any) {
       console.error('Error saving admin:', error);
@@ -119,27 +117,17 @@ export default function AdminManagement() {
     }
   };
 
-  const handleDelete = async (adminId: string) => {
-    if (!window.confirm('Are you sure you want to remove admin privileges from this user?')) return;
-
-    try {
-      await axios.delete(`/api/admin/admins/${adminId}`);
-      toast.success('Admin privileges removed');
-      fetchAdmins();
-    } catch (error: any) {
-      console.error('Error removing admin:', error);
-      toast.error(error.response?.data?.message || 'Failed to remove admin');
-    }
-  };
+  const handleDelete = (adminId: string) => { const target = admins.find(person => person.id === adminId); if (target && target.role !== 'superadmin') setRemoval(target); };
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
 
   return (
-    <div className="p-4">
+    <div className="space-y-3">
+      <OwnershipAccess />
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Administrator access</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Administrator directory</h1>
         <button
           disabled={currentUserRole !== 'superadmin'}
           title={currentUserRole !== 'superadmin' ? 'Superadmin permission required' : 'Create administrator'}
@@ -193,7 +181,7 @@ export default function AdminManagement() {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${admin.role === 'superadmin' ? 'bg-blue-100 text-blue-800' : 'bg-blue-100 text-blue-800'
                     }`}>
-                    {admin.role}
+                    {admin.role === 'superadmin' ? 'Platform Owner' : 'Administrator'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -204,7 +192,7 @@ export default function AdminManagement() {
                     <PencilIcon className="h-5 w-5" />
                   </button>
                   <button
-                    disabled={currentUserRole !== 'superadmin'} onClick={() => handleDelete(admin.id)}
+                    disabled={currentUserRole !== 'superadmin' || admin.role === 'superadmin'} aria-label={'Remove administrator access for ' + admin.name} onClick={() => handleDelete(admin.id)}
                     className="text-red-600 hover:text-red-900"
                   >
                     <TrashIcon className="h-5 w-5" />
@@ -216,6 +204,7 @@ export default function AdminManagement() {
         </table>
       </div>
 
+      {removal && <OwnershipAction mode="remove" target={{ _id: removal.id, name: removal.name, email: removal.email }} onClose={() => setRemoval(null)} onDone={() => { setRemoval(null); fetchAdmins(); notifyManagementUpdated(); toast.success('Administrator access removed'); }} />}
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -257,6 +246,7 @@ export default function AdminManagement() {
                   <input
                     type="password"
                     name="password"
+                    minLength={12}
                     value={formData.password}
                     onChange={handleInputChange}
                     required
@@ -269,6 +259,7 @@ export default function AdminManagement() {
                 <input
                   type="text"
                   name="phone"
+                  required
                   value={formData.phone}
                   onChange={handleInputChange}
                   className="mt-1 w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -284,23 +275,6 @@ export default function AdminManagement() {
                   className="mt-1 w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              {currentUserRole === 'superadmin' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Role</label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="user">User</option>
-                    <option value="worker">Worker</option>
-                    <option value="admin">Admin</option>
-                    <option value="superadmin">Super Admin</option>
-                    <option value="blocked">Blocked</option>
-                  </select>
-                </div>
-              )}
               <div className="flex justify-end space-x-4 pt-4 border-t border-gray-100">
                 <button
                   type="button"

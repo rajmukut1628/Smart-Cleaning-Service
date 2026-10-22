@@ -3,9 +3,13 @@ import mongoose from 'mongoose';
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true }, // Required for local auth
+  password: { type: String, required: true }, // Local password hash; Google accounts receive an unusable random hash.
+  authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
+  googleSubject: { type: String, unique: true, sparse: true },
+  emailVerifiedAt: { type: Date },
+  sessionVersion: { type: Number, default: 0, select: true },
   role: { type: String, enum: ['user', 'worker', 'admin', 'superadmin', 'blocked'], default: 'user' },
-  phone: { type: String, required: true },
+  phone: { type: String, required: function (this: any) { return this.authProvider !== 'google'; }, default: '' },
   address: { type: String },
   profilePicture: { type: String, default: '' },
   adminSettings: { type: mongoose.Schema.Types.Mixed, default: () => ({ emailNotifications: true, systemAlerts: true, userRegistrationAlerts: true, bookingAlerts: true, twoFactorEnabled: false, dashboardTheme: 'light', itemsPerPage: 10, autoRefreshInterval: 30 }) },

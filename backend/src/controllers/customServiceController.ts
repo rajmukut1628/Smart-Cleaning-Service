@@ -1,3 +1,4 @@
+import { storeImage, ImageStorageError } from '../utils/imageStorage';
 import { Request, Response } from 'express';
 import Service from '../models/Service';
 
@@ -45,7 +46,7 @@ export const createCustomService = async (req: AuthenticatedRequest, res: Respon
     // Handle image upload
     let image = '';
     if (req.file) {
-      image = `/uploads/${req.file.filename}`;
+      image = await storeImage(req.file);
     } else {
       return res.status(400).json({ message: 'Service image is required' });
     }
@@ -68,7 +69,7 @@ export const createCustomService = async (req: AuthenticatedRequest, res: Respon
     res.status(201).json(createdService);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(error instanceof ImageStorageError ? error.status : 500).json({ message: error instanceof ImageStorageError ? error.message : 'Server Error' });
   }
 };
 
@@ -85,7 +86,7 @@ export const getUserCustomServices = async (req: AuthenticatedRequest, res: Resp
     res.json(services);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(error instanceof ImageStorageError ? error.status : 500).json({ message: error instanceof ImageStorageError ? error.message : 'Server Error' });
   }
 };
 
@@ -133,7 +134,7 @@ export const updateCustomService = async (req: AuthenticatedRequest, res: Respon
     // Handle image upload
     let image = service.image;
     if (req.file) {
-      image = `/uploads/${req.file.filename}`;
+      image = await storeImage(req.file);
     }
 
     service.name = name;
@@ -149,7 +150,7 @@ export const updateCustomService = async (req: AuthenticatedRequest, res: Respon
     res.json(updatedService);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(error instanceof ImageStorageError ? error.status : 500).json({ message: error instanceof ImageStorageError ? error.message : 'Server Error' });
   }
 };
 
@@ -178,6 +179,6 @@ export const deleteCustomService = async (req: AuthenticatedRequest, res: Respon
     res.json({ message: 'Service deleted successfully' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(error instanceof ImageStorageError ? error.status : 500).json({ message: error instanceof ImageStorageError ? error.message : 'Server Error' });
   }
 };

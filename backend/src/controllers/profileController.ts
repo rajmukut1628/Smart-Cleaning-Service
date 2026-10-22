@@ -1,3 +1,4 @@
+import { storeImage, ImageStorageError } from '../utils/imageStorage';
 import { Request, Response, NextFunction } from 'express';
 import User from '../models/User';
 import Booking from '../models/Booking';
@@ -15,7 +16,7 @@ export const getProfile = async (req: AuthenticatedRequest, res: Response) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+    res.json({ ...user.toObject(), role: req.user.role });
   } catch (error: any) {
     res.status(500).json({ message: 'Failed to fetch profile', error: error.message });
   }
@@ -82,16 +83,12 @@ export const updateProfilePicture = async (req: AuthenticatedRequest, res: Respo
     const userId = req.user?.userId || req.user?._id;
     const file = req.file;
 
-    console.log('📸 Profile picture upload request');
-    console.log('File:', file);
-    console.log('User ID:', userId);
 
     if (!file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const profilePicture = `/uploads/${file.filename}`;
-    console.log('💾 Saving profile picture path:', profilePicture);
+    const profilePicture = await storeImage(file);
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
@@ -103,7 +100,6 @@ export const updateProfilePicture = async (req: AuthenticatedRequest, res: Respo
       return res.status(404).json({ message: 'User not found' });
     }
 
-    console.log('✅ Profile picture updated:', updatedUser.profilePicture);
 
     res.json({
       message: 'Profile picture updated successfully',
@@ -111,7 +107,7 @@ export const updateProfilePicture = async (req: AuthenticatedRequest, res: Respo
     });
   } catch (error: any) {
     console.error('❌ Profile picture upload error:', error);
-    res.status(500).json({ message: 'Failed to update profile picture', error: error.message });
+    res.status(error instanceof ImageStorageError ? error.status : 500).json({ message: error instanceof ImageStorageError ? error.message : 'Failed to update profile picture' });
   }
 };
 

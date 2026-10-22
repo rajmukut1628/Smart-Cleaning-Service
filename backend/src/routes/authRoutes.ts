@@ -1,11 +1,16 @@
 import express from 'express';
-import User from '../models/User';
-import { registerUser, loginUser } from '../controllers/authController';
+import { loginUser, googleAuth } from '../controllers/authController';
+import { registerUser, verifyRegistration, resendVerification, googleRegister } from '../controllers/registrationController';
+import { limitRegistrationEmails } from '../middleware/registrationRateLimit';
 
 const router = express.Router();
 
 // Traditional auth routes
-router.post('/register', registerUser);
+router.post('/register', limitRegistrationEmails, registerUser);
+router.post('/register/verify', verifyRegistration);
+router.post('/register/resend', limitRegistrationEmails, resendVerification);
 router.post('/login', loginUser);
+router.post('/google', googleAuth);
+router.post('/google/register', googleRegister);
 
 export default router;

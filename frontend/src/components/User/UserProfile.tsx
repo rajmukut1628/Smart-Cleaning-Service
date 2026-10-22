@@ -1,7 +1,7 @@
+import { imageUrl } from '../../utils/imageUrl';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE_URL } from '../../config/apiConfig';
 import {
   UserCircleIcon,
   CameraIcon,
@@ -84,10 +84,6 @@ export default function UserProfile() {
   const fetchProfile = async () => {
     try {
       const response = await axios.get('/api/profile');
-      console.log('Profile data:', response.data);
-      console.log('Profile picture:', response.data.profilePicture);
-      console.log('API_BASE_URL:', API_BASE_URL);
-      console.log('Full image URL will be:', `${API_BASE_URL}${response.data.profilePicture}`);
       
       setProfile(response.data);
       setFormData({
@@ -214,13 +210,10 @@ export default function UserProfile() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       
-      console.log('Upload response:', response.data);
-      console.log('Profile picture path:', response.data.user.profilePicture);
-      console.log('Full URL:', `${API_BASE_URL}${response.data.user.profilePicture}`);
       
       setProfile(response.data.user);
       updateUserProfile({
-        avatar: `${API_BASE_URL}${response.data.user.profilePicture}`,
+        avatar: imageUrl(response.data.user.profilePicture),
       });
       // Reload profile to get updated image
       fetchProfile();
@@ -298,12 +291,12 @@ export default function UserProfile() {
                   {profile?.profilePicture ? (
                     <>
                       <img
-                        src={`${API_BASE_URL}${profile.profilePicture}`}
+                        src={imageUrl(profile.profilePicture)}
                         alt="Profile"
                         className="w-24 h-24 rounded-full object-cover border-4 border-blue-100"
                         onError={(e) => {
                           console.error('Image load error:', profile.profilePicture);
-                          console.error('Attempted URL:', `${API_BASE_URL}${profile.profilePicture}`);
+                          console.error('Attempted URL:', imageUrl(profile.profilePicture));
                           console.error('Status:', e);
                           e.currentTarget.style.display = 'none';
                         }}

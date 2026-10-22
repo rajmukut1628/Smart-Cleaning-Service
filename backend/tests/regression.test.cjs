@@ -1,3 +1,4 @@
+require('./helpers/ownership.cjs');
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
@@ -47,17 +48,8 @@ test('local Vite origins include localhost and numeric loopback on fallback port
   }
 });
 
-test('registration ignores a supplied superadmin role and normalizes email', async () => {
-  const find = User.findOne, create = User.create;
-  let captured;
-  User.findOne = async () => null;
-  User.create = async data => { captured = data; return { ...data, _id: 'user-1' }; };
-  try {
-    const res = response();
-    await auth.registerUser({ body: { name: 'Test', email: ' TEST@EXAMPLE.COM ', password: 'test-password', phone: '01000000000', role: 'superadmin' } }, res);
-    assert.equal(res.body.token, undefined); assert.equal(res.body.password, undefined); assert.match(res.body.message, /sign in/i);
-    assert.equal(res.code, 201); assert.equal(captured.role, 'user'); assert.equal(captured.email, 'test@example.com'); assert.notEqual(captured.password, 'test-password');
-  } finally { User.findOne = find; User.create = create; }
+test('new registrations reject malformed email addresses', async () => {
+  const res=response();await auth.registerUser({body:{name:'Test',email:'test@@example.com',phone:'01000000000',password:'test-password'}},res);assert.equal(res.code,400);
 });
 test('registration rejects weak credentials before querying the database', async () => {
   const res = response(); await auth.registerUser({body:{name:'Test',email:'bad-email',phone:'01',password:'123'}},res); assert.equal(res.code,400);

@@ -1,3 +1,4 @@
+import { imageUrl } from '../utils/imageUrl';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { User } from '../types';
@@ -11,7 +12,9 @@ type AuthenticatedUser = User & {
 interface AuthContextType {
   user: AuthenticatedUser | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, phone: string) => Promise<boolean>;
+  loginWithGoogle: (credential: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, phone: string) => Promise<{ verificationId: string; email: string; retryAfter: number }>;
+  verifyRegistration: (verificationId: string, code: string) => Promise<void>;
   logout: () => void;
   updateUserProfile: (userData: Partial<AuthenticatedUser>) => void;
   isLoading: boolean;
@@ -24,6 +27,22 @@ const API_URL = `${API_BASE_URL}/api`;
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const establishSession = (userData: any) => {
+    const authenticatedUser: AuthenticatedUser = {
+      id: userData._id,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      phone: userData.phone || '',
+      avatar: userData.profilePicture ? imageUrl(userData.profilePicture) : '',
+      address: userData.address || '',
+      token: userData.token,
+    };
+    setUser(authenticatedUser);
+    localStorage.setItem('bd-clean-user', JSON.stringify(authenticatedUser));
+    axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
+  };
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -48,21 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await axios.post(`${API_URL}/auth/login`, { email, password });
       
-      const userData = response.data;
-      const authenticatedUser: AuthenticatedUser = {
-        id: userData._id,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
-        phone: userData.phone || '',
-        avatar: userData.profilePicture ? `${API_BASE_URL}${userData.profilePicture}` : '',
-        address: userData.address || '',
-        token: userData.token,
-      };
-
-      setUser(authenticatedUser);
-      localStorage.setItem('bd-clean-user', JSON.stringify(authenticatedUser));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
+      establishSession(response.data);
       
       setIsLoading(false);
       return true;
@@ -73,10 +78,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string, phone: string): Promise<boolean> => {
+  const loginWithGoogle = async (credential: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/auth/google`, { credential });
+      establishSession(response.data);
+      return true;
+    } catch (error) {
+      console.error('Google sign-in failed:', error);
+      throw error;
+    } finally { setIsLoading(false); }
+  };
+
+  const register = async (name: string, email: string, password: string, phone: string): Promise<{ verificationId: string; email: string; retryAfter: number }> => {
     // Creating an account does not establish an authenticated session.
-    await axios.post(`${API_URL}/auth/register`, { name, email, password, phone });
-    return true;
+    const { data } = await axios.post(`${API_URL}/auth/register`, { name, email, password, phone });
+    return data;
+  };
+  const verifyRegistration = async (verificationId: string, code: string): Promise<void> => {
+    const { data } = await axios.post(API_URL + '/auth/register/verify', { verificationId, code });
+    establishSession(data);
   };
   const logout = () => {
     setUser(null);
@@ -85,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const expire = () => setUser(null);
+    const expire = () => { setUser(null); localStorage.removeItem('bd-clean-user'); delete axios.defaults.headers.common.Authorization; };
     window.addEventListener('session-expired', expire);
     return () => window.removeEventListener('session-expired', expire);
   }, []);
@@ -99,7 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateUserProfile, isLoading }}>
+    <AuthContext.Provider value={{ user, login, loginWithGoogle, register, verifyRegistration, logout, updateUserProfile, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

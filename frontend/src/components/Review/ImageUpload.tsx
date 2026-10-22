@@ -1,7 +1,7 @@
+import { imageUrl } from '../../utils/imageUrl';
 import { useState } from 'react';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import api from '../../utils/axios';
-import { API_BASE_URL } from '../../config/apiConfig';
 import toast from 'react-hot-toast';
 
 interface ImageUploadProps {
@@ -128,7 +128,7 @@ export default function ImageUpload({
                 {existingImages.map((url, index) => (
                   <div key={index} className="relative group">
                     <img
-                      src={`${API_BASE_URL}${url}`}
+                      src={imageUrl(url)}
                       alt={`Existing ${type} ${index + 1}`}
                       className="w-full h-32 object-cover rounded-lg"
                     />

@@ -1,3 +1,4 @@
+require('./helpers/ownership.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const express=require('express');
@@ -11,10 +12,11 @@ const auth=require('../dist/controllers/authController');
 const response=()=>({code:200,body:null,status(code){this.code=code;return this;},json(body){this.body=body;return this;}});
 const chain=data=>({select(){return this;},populate(){return this;},sort(){return this;},limit(){return this;},lean:async()=>data});
 const booking={_id:'own-booking',service:{name:'Office cleaning'},worker:'assigned-worker',workers:['assigned-worker'],status:'confirmed',scheduledDate:'2026-10-23',scheduledTime:'10:00',address:'Example service area',createdAt:'2026-10-20',updatedAt:'2026-10-21'};
-test('registration creates an account without session credentials and separate login issues a token',async()=>{
- const find=User.findOne,create=User.create,secret=process.env.JWT_SECRET;let created;User.findOne=async()=>null;User.create=async data=>(created={...data,_id:'test-customer'});process.env.JWT_SECRET='isolated-registration-test';
- try{const res=response();await auth.registerUser({body:{name:'Test Customer',email:'test@example.test',phone:'01000000000',password:'test-password'}},res);assert.equal(res.code,201);assert.equal(res.body.token,undefined);assert.equal(res.body.password,undefined);assert.match(res.body.message,/sign in/i);User.findOne=async()=>created;const logged=response();await auth.loginUser({body:{email:'test@example.test',password:'test-password'}},logged);assert.equal(logged.code,200);assert.equal(jwt.verify(logged.body.token,process.env.JWT_SECRET).id,'test-customer');}finally{User.findOne=find;User.create=create;if(secret===undefined)delete process.env.JWT_SECRET;else process.env.JWT_SECRET=secret;}
+test('existing customer password accounts still receive a token from a separate sign-in',async()=>{
+ const find=User.findOne,secret=process.env.JWT_SECRET;process.env.JWT_SECRET='isolated-registration-test';
+ try{const password=await require('bcryptjs').hash('test-password',10);User.findOne=async()=>({_id:'test-customer',role:'user',email:'test@example.test',password});const logged=response();await auth.loginUser({body:{email:'test@example.test',password:'test-password'}},logged);assert.equal(logged.code,200);assert.equal(jwt.verify(logged.body.token,process.env.JWT_SECRET).id,'test-customer');}finally{User.findOne=find;if(secret===undefined)delete process.env.JWT_SECRET;else process.env.JWT_SECRET=secret;}
 });
+
 test('customer notifications have stable read keys and changes create new updates',()=>{
  const first=controller.buildCustomerNotifications([booking])[0];assert.equal(first.href,'/user-dashboard?booking=own-booking');assert.equal(first.id,controller.buildCustomerNotifications([{...booking,updatedAt:'2026-10-25',beforeImages:['photo']}])[0].id);assert.notEqual(first.id,controller.buildCustomerNotifications([{...booking,status:'cancelled'}])[0].id);assert.notEqual(first.id,controller.buildCustomerNotifications([{...booking,scheduledTime:'12:00'}])[0].id);assert.notEqual(first.id,controller.buildCustomerNotifications([{...booking,workers:['new-worker']}])[0].id);
 });
