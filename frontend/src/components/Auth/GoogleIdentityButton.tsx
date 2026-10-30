@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 type GoogleCredentialResponse = { credential: string };
 type GoogleIdentityApi = {
   initialize: (options: { client_id: string; callback: (response: GoogleCredentialResponse) => void }) => void;
-  renderButton: (element: HTMLElement, options: { theme: 'outline'; size: 'large'; shape: 'pill'; text: 'continue_with' | 'signup_with'; logo_alignment: 'left'; width: number }) => void;
+  renderButton: (element: HTMLElement, options: { theme: 'outline'; size: 'large' | 'medium'; shape: 'pill'; text: 'continue_with' | 'signup_with'; logo_alignment: 'left'; width: number }) => void;
 };
 declare global { interface Window { google?: { accounts?: { id?: GoogleIdentityApi } } } }
 
@@ -37,7 +37,8 @@ export default function GoogleIdentityButton({ mode, onCredential }: GoogleIdent
         }).finally(() => setWorking(false));
       } });
       holder.current.replaceChildren();
-      google.renderButton(holder.current, { theme: 'outline', size: 'large', shape: 'pill', text: mode === 'login' ? 'continue_with' : 'signup_with', logo_alignment: 'left', width: Math.min(holder.current.clientWidth || 340, 360) });
+      // Google's medium button keeps the generic label instead of account personalization.
+      google.renderButton(holder.current, { theme: 'outline', size: mode === 'login' ? 'medium' : 'large', shape: 'pill', text: mode === 'login' ? 'continue_with' : 'signup_with', logo_alignment: 'left', width: Math.min(holder.current.clientWidth || 340, 360) });
     };
     const existing = document.querySelector<HTMLScriptElement>('script[data-google-identity]');
     if (!window.google?.accounts?.id && !existing) {
