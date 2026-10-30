@@ -47,31 +47,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+      const response = await axios.post(`${API_URL}/auth/login`, { email, password }, { timeout: 90000 });
       
       establishSession(response.data);
       
-      setIsLoading(false);
       return true;
     } catch (error: unknown) {
       console.error('Login failed:', error);
-      setIsLoading(false);
       throw error;
     }
   };
 
   const loginWithGoogle = async (credential: string): Promise<boolean> => {
-    setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/auth/google`, { credential });
+      const response = await axios.post(`${API_URL}/auth/google`, { credential }, { timeout: 90000 });
       establishSession(response.data);
       return true;
     } catch (error) {
       console.error('Google sign-in failed:', error);
       throw error;
-    } finally { setIsLoading(false); }
+    }
   };
 
   const register = async (name: string, email: string, password: string, phone: string): Promise<{ verificationId: string; email: string; retryAfter: number }> => {

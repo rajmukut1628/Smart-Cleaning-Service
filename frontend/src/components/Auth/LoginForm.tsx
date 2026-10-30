@@ -6,14 +6,15 @@ import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import GoogleIdentityButton from './GoogleIdentityButton';
 import AuthFrame from './AuthFrame';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 
 interface LoginFormProps {
   onSwitchPage: () => void;
 }
 
 export default function LoginForm({ onSwitchPage }: LoginFormProps) {
-  const { login, loginWithGoogle, isLoading } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,19 +22,21 @@ export default function LoginForm({ onSwitchPage }: LoginFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+    setIsLoading(true);
     setError('');
 
     try {
       await login(email, password);
       toast.success('Successfully logged in!');
     } catch (error: unknown) {
-      const errorMessage = (axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || (error instanceof Error?error.message:undefined) || 'Invalid credentials. Please try again.';
+      const errorMessage = axios.isAxiosError(error) && ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code || '') ? 'Sign-in is taking too long. Please try again.' : (axios.isAxiosError<{message:string}>(error)?error.response?.data.message:undefined) || (error instanceof Error?error.message:undefined) || 'Invalid credentials. Please try again.';
       setError(errorMessage);
       toast.error(errorMessage, {
         duration: 4000,
         icon: '⚠️',
       });
-    }
+    } finally { setIsLoading(false); }
   };
 
   return <AuthFrame>
@@ -43,7 +46,7 @@ export default function LoginForm({ onSwitchPage }: LoginFormProps) {
       <label className="auth-field" htmlFor="password"><span>Password</span><div className="auth-password"><input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlashIcon /> : <EyeIcon />}</button></div></label>
       <Link className="auth-forgot-link" to="/forgot-password">Forgot password?</Link>
       {error && <div role="alert" className="auth-error">{error}</div>}
-      <button type="submit" disabled={isLoading} className="auth-submit">{isLoading ? 'Signing in...' : 'Sign in'}<ArrowRight size={15} /></button>
+      <button type="submit" disabled={isLoading} aria-busy={isLoading} className="auth-submit">{isLoading ? 'Signing in...' : 'Sign in'}{isLoading ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <ArrowRight size={15} />}</button>
     </form>
     <p className="auth-switch">Don't have an account?<button type="button" onClick={onSwitchPage}>Sign up</button></p>
     <div className="auth-divider">or continue with Google</div>
