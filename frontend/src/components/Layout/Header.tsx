@@ -1,3 +1,4 @@
+import { Sparkles } from 'lucide-react';
 import ActivityNotifications from '../Admin/ActivityNotifications';
 import AccountNotifications from '../common/AccountNotifications';
 import { useState, useEffect } from 'react';
@@ -145,8 +146,8 @@ export default function Header() {
           {/* Logo */}
           <div className="min-w-0 flex items-center">
             <div className="flex min-w-0 items-center">
-              <div className="shrink-0 w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">BC</span>
+              <div className="public-brand-icon">
+                <Sparkles size={23} aria-hidden="true" />
               </div>
               <div className="ml-2.5 min-w-0">
                 <h1 className="truncate text-base font-bold tracking-tight text-gray-900">Smart Cleaning Service</h1>
