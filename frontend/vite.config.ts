@@ -3,7 +3,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Local UI can use the deployed API without opening a direct Atlas connection.
+  const target = mode === 'live' ? 'https://smart-cleaning-service.onrender.com' : 'http://localhost:5003';
+  return {
   plugins: [react(),tailwindcss()],
   build: {
     rollupOptions: {
@@ -20,10 +23,13 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      '/socket.io': { target, changeOrigin: true, ws: true },
+      '/uploads': { target, changeOrigin: true },
       '/api': {
-        target: 'http://localhost:5003',
+        target,
         changeOrigin: true,
       },
     },
   },
+  };
 });

@@ -38,7 +38,7 @@ export default function GoogleIdentityButton({ mode, onCredential }: GoogleIdent
       } });
       holder.current.replaceChildren();
       // Google's medium button keeps the generic label instead of account personalization.
-      google.renderButton(holder.current, { theme: 'outline', size: mode === 'login' ? 'medium' : 'large', shape: 'pill', text: mode === 'login' ? 'continue_with' : 'signup_with', logo_alignment: 'left', width: Math.min(holder.current.clientWidth || 340, 360) });
+      google.renderButton(holder.current, { theme: 'outline', size: 'medium', shape: 'pill', text: mode === 'login' ? 'continue_with' : 'signup_with', logo_alignment: 'left', width: Math.min(holder.current.clientWidth || 340, 360) });
     };
     const existing = document.querySelector<HTMLScriptElement>('script[data-google-identity]');
     if (!window.google?.accounts?.id && !existing) {

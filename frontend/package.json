@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.app.json && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:live": "vite --mode live --host localhost --port 5173 --strictPort"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

@@ -46,13 +46,11 @@ function AppContent() {
 
 
   React.useEffect(() => {
-    if (user && !isLoading) {
-      // After login, stay on home page or current page
-      // Only redirect from login/register pages to home
-      if (location.pathname === '/login' || location.pathname === '/register') {
-        navigate('/');
-      }
-    }
+    if (!user || isLoading || !['/login', '/register'].includes(location.pathname)) return;
+    const dashboard = user.role === 'user' ? '/user-dashboard'
+      : user.role === 'worker' ? '/worker-dashboard'
+      : ['admin', 'superadmin'].includes(user.role) ? '/admin-dashboard' : '/';
+    navigate(dashboard, { replace: true });
   }, [user, isLoading, navigate, location.pathname]);
 
 
