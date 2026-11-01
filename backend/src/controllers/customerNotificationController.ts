@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { Request, Response } from 'express';
 import Booking from '../models/Booking';
+import CustomRequest from '../models/CustomCleaningRequest';
 import NotificationRead from '../models/NotificationRead';
 interface CustomerRequest extends Request { user?: { _id: unknown; role: string } }
 const key = (...parts: unknown[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
@@ -21,7 +22,8 @@ export function buildCustomerNotifications(bookings: any[]) {
 }
 async function inbox(customerId: unknown) {
   const bookings = await Booking.find({ user: customerId }).select('_id service status scheduledDate scheduledTime address worker workers paymentStatus paymentConfirmedAt isReviewed completedAt createdAt updatedAt reschedule cancellation').populate('service', 'name').sort({ updatedAt: -1 }).limit(50).lean();
-  return buildCustomerNotifications(bookings);
+  const requests=await CustomRequest.find({customer:customerId,status:{$in:['quoted','rejected']}}).sort({updatedAt:-1}).limit(50).lean();
+  return [...buildCustomerNotifications(bookings),...buildCustomRequestNotifications(requests)].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id)).slice(0,150);
 }
 export async function getCustomerNotifications(req: CustomerRequest, res: Response) {
   try {
@@ -42,3 +44,12 @@ export async function readCustomerNotifications(req: CustomerRequest, res: Respo
   } catch { res.status(500).json({ message: 'Unable to update notifications. Please try again.' }); }
 }
 
+
+export function buildCustomRequestNotifications(requests:any[]){
+ return requests.filter(row=>['quoted','rejected'].includes(row.status)).map(row=>({
+ id:key('customer-custom-request',String(row._id),row.status,row.version),type:'custom-request',
+ title:row.status==='quoted'?'Your cleaning quote is ready':'Your custom cleaning request was reviewed',
+ message:row.status==='quoted'?row.title+' · Review the administrator’s price and duration before booking.':row.title+' · Open your request to view the decision.',
+ createdAt:new Date(row.quote?.quotedAt&&row.status==='quoted'?row.quote.quotedAt:row.updatedAt).toISOString(),href:'/custom-requests?request='+String(row._id),read:false
+ }));
+}

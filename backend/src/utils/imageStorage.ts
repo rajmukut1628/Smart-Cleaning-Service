@@ -68,3 +68,15 @@ export function isUploadedImage(value: unknown): value is string {
       url.pathname.startsWith(`/${cloud}/image/upload/`) && /\/smart-cleaning-service\/[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(url.pathname));
   } catch { return false; }
 }
+
+// Check storage itself before accepting user-supplied evidence paths.
+export async function uploadedImageExists(value: unknown): Promise<boolean> {
+ if (!isUploadedImage(value)) return false;
+ if (value.startsWith('/uploads/')) {
+  try { const file=await fs.stat(path.resolve('uploads',path.basename(value))); return file.isFile()&&file.size>0; } catch { return false; }
+ }
+ return new Promise(resolve=>{
+  const request=https.request(value,{method:'HEAD',timeout:10000},response=>{response.resume();resolve(response.statusCode===200&&/^image\//i.test(String(response.headers['content-type']||'')));});
+  request.on('timeout',()=>request.destroy());request.on('error',()=>resolve(false));request.end();
+ });
+}

@@ -63,8 +63,9 @@ test('earnings split a booking amount across unique team members', async () => {
   try {const res=response(); await worker.getWorkerEarnings({user:{_id:'a'}},res);assert.equal(res.body.totalEarnings,600);assert.equal(res.body.monthlyEarnings['2026-10'],600);} finally{Booking.find=find;}
 });
 test('secondary assigned workers can upload after photos', async () => {
-  const find=Booking.findById;let saved=false;Booking.findById=async()=>({user:'customer',worker:'a',workers:['a','b'],save:async()=>{saved=true;}});
-  try{const res=response();await bookingController.uploadAfterImages({params:{id:'booking'},body:{images:['/uploads/example.png']},user:{_id:'b',role:'worker'}},res);assert.equal(res.code,200);assert.ok(saved);}finally{Booking.findById=find;}
+  const storage=require('../dist/utils/imageStorage'),exists=storage.uploadedImageExists;storage.uploadedImageExists=async()=>true;
+  const find=Booking.findById;let saved=false;Booking.findById=async()=>({user:'customer',worker:'a',workers:['a','b'],status:'in-progress',save:async()=>{saved=true;}});
+  try{const res=response();await bookingController.uploadAfterImages({params:{id:'booking'},body:{images:['/uploads/example.png']},user:{_id:'b',role:'worker'}},res);assert.equal(res.code,200);assert.ok(saved);}finally{Booking.findById=find;storage.uploadedImageExists=exists;}
 });
 test('workers cannot complete cancelled jobs',async()=>{
  const find=Booking.findById;Booking.findById=async()=>({worker:'a',workers:['a'],status:'cancelled'});

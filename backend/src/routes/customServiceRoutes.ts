@@ -1,12 +1,6 @@
 import express from 'express';
-import {
-  createCustomService,
-  getUserCustomServices,
-  updateCustomService,
-  deleteCustomService,
-} from '../controllers/customServiceController';
+import {  getUserCustomServices,} from '../controllers/customServiceController';
 import { protect } from '../middleware/authMiddleware';
-import { imageUpload as upload } from '../utils/imageStorage';
 
 const router = express.Router();
 
@@ -16,10 +10,10 @@ router.use(protect);
 // Custom service routes
 router.route('/')
   .get(getUserCustomServices)
-  .post(upload.single('image'), createCustomService);
+  .post((_req,res)=>res.status(403).json({message:'Submit a custom cleaning request for an administrator quote instead.'}));
 
 router.route('/:id')
-  .put(upload.single('image'), updateCustomService)
-  .delete(deleteCustomService);
+  .put((_req,res)=>res.status(403).json({message:'Customer service editing is disabled. Use Custom cleaning requests.'}))
+  .delete((_req,res)=>res.status(403).json({message:'Customer service deletion is disabled.'}));
 
 export default router;

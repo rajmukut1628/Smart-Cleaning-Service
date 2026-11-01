@@ -1,3 +1,4 @@
+import customRequestRoutes from './routes/customRequestRoutes';
 import mongoose from 'mongoose';
 import {automationBackupAccess} from './middleware/automationAccess';
 import {downloadBackup} from './controllers/operationsController';
@@ -71,6 +72,7 @@ app.use('/api/unit-configs', unitConfigRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/support',supportRoutes);
+app.use('/api/custom-requests',customRequestRoutes);
 
 // Serve uploaded files statically
 // In development (ts-node): __dirname = 'backend/src', uploads = 'backend/uploads'

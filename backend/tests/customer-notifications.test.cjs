@@ -1,3 +1,5 @@
+const {beforeEach,afterEach}=require('node:test');const CustomRequest=require('../dist/models/CustomCleaningRequest').default;const customFind=CustomRequest.find;
+beforeEach(()=>{CustomRequest.find=()=>({sort(){return this},limit(){return this},lean:async()=>[]});});afterEach(()=>{CustomRequest.find=customFind;});
 require('./helpers/ownership.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
@@ -35,4 +37,11 @@ test('customer notification routes enforce login, role and account boundaries',a
  const app=express();app.use(express.json());app.use('/api/bookings',require('../dist/routes/bookingRoutes').default);const server=http.createServer(app);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const userFind=User.findById,find=Booking.find,read=Read.find,secret=process.env.JWT_SECRET;let ownQuery;process.env.JWT_SECRET='isolated-customer-notification-test';User.findById=id=>({select:async()=>({_id:id,role:id==='worker'?'worker':'user'})});Booking.find=query=>{ownQuery=query;return chain([]);};Read.find=()=>chain([]);
  const request=token=>new Promise((resolve,reject)=>{const req=http.get({host:'127.0.0.1',port:server.address().port,path:'/api/bookings/notifications?userId=other-customer',headers:token?{authorization:'Bearer '+token}:{}},res=>{res.resume();res.on('end',()=>resolve(res.statusCode));});req.on('error',reject);});
  try{assert.equal(await request(),401);assert.equal(await request(jwt.sign({id:'worker'},process.env.JWT_SECRET)),403);assert.equal(await request(jwt.sign({id:'customer-a'},process.env.JWT_SECRET)),200);assert.deepEqual(ownQuery,{user:'customer-a'});}finally{User.findById=userFind;Booking.find=find;Read.find=read;if(secret===undefined)delete process.env.JWT_SECRET;else process.env.JWT_SECRET=secret;await new Promise(resolve=>server.close(resolve));}
+});
+
+test('custom quote notifications link to the request and change identity for revised quotes',()=>{
+ const row={_id:'quote-a',title:'Home cleaning',status:'quoted',version:1,quote:{quotedAt:'2026-11-01'}};
+ const [first]=controller.buildCustomRequestNotifications([row]);assert.equal(first.href,'/custom-requests?request=quote-a');assert.equal(first.type,'custom-request');
+ assert.notEqual(first.id,controller.buildCustomRequestNotifications([{...row,version:2}])[0].id);
+ assert.deepEqual(controller.buildCustomRequestNotifications([{...row,status:'booked'}]),[]);
 });

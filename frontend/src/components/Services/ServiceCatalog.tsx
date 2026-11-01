@@ -7,7 +7,6 @@ import ImageLightbox from '../common/ImageLightbox';
 import { Service } from '../../types';
 import { API_BASE_URL } from '../../config/apiConfig';
 import BookingModal from './BookingModal';
-import CustomServiceModal from './CustomServiceModal';
 
 interface ServiceFromAPI extends Omit<Service, 'id'> { _id: string }
 
@@ -38,17 +37,15 @@ export default function ServiceCatalog() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
   const [filter, setFilter] = useState('all');
   const fetchServices = useCallback(async () => {
     setIsLoading(true); setError(null);
     try {
       const { data: publicServices } = await axios.get<ServiceFromAPI[]>('/api/services');
-      const customServices = user?.id && user.role === 'user' ? (await axios.get<ServiceFromAPI[]>('/api/services/custom')).data : [];
-      setServices([...publicServices, ...customServices].map(({ _id, ...rest }) => ({ id: _id, ...rest })));
+      setServices(publicServices.map(({ _id, ...rest }) => ({ id: _id, ...rest })));
     } catch { setError('Unable to load services. Please try again.'); }
     finally { setIsLoading(false); }
-  }, [user?.id, user?.role]);
+  }, []);
   useEffect(() => { fetchServices(); }, [fetchServices]);
   const categories = ['all', ...Array.from(new Set(services.map(service => service.category).filter(Boolean)))];
   const filteredServices = services.filter(service => filter === 'all' || service.category === filter);
@@ -57,7 +54,7 @@ export default function ServiceCatalog() {
   return <div className="catalog-page mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div><div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-blue-600" /><p className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-600">Thoughtful care. Beautiful spaces.</p></div><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Find your perfect clean<span className="text-blue-600">.</span></h1><p className="mt-1 text-[13px] text-slate-500">Professional cleaning, clear pricing, and a time that suits you.</p></div>
-      {user?.role === 'user' && <button onClick={() => setShowCustomServiceModal(true)} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"><Plus size={16} />Custom service</button>}
+      {user?.role === 'user' && <button onClick={() => navigate('/custom-requests')} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"><Plus size={16} />Custom cleaning requests</button>}
     </div>
     <div className="mb-4 flex items-center justify-between gap-4 border-b border-blue-100 pb-3">
       <nav aria-label="Service categories" className="flex gap-1.5 overflow-x-auto">{categories.map(category => <button key={category} aria-pressed={filter === category} onClick={() => setFilter(category)} className={'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition ' + (filter === category ? 'bg-blue-600 text-white shadow-sm shadow-blue-200' : 'bg-white/70 text-slate-500 hover:bg-blue-100 hover:text-blue-700')}>
@@ -82,7 +79,6 @@ export default function ServiceCatalog() {
     </div>}
     <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[10px] text-slate-400"><span className="inline-flex items-center gap-1.5"><Check size={12} className="text-blue-500" />Transparent pricing</span><span>Flexible scheduling</span><span>Pay cash after service</span></div>
     {selectedService && <BookingModal service={selectedService} onClose={() => setSelectedService(null)} />}
-    {showCustomServiceModal && <CustomServiceModal onClose={() => setShowCustomServiceModal(false)} onServiceCreated={() => { setShowCustomServiceModal(false); fetchServices(); }} />}
   </div>;
 }
 

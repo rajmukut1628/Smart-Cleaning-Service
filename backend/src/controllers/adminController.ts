@@ -206,6 +206,7 @@ export const createBookingByAdmin = async (req: Request, res: Response) => {
  const customer=await User.findOne({_id:user,role:'user'});const savedService=await (await import('../models/Service')).default.findById(service).populate('unitConfig');
  if(!customer||!savedService)return res.status(404).json({message:'Customer or service unavailable'});
  if(savedService.isCustom&&String(savedService.createdBy)!==String(user))return res.status(403).json({message:'This custom service belongs to another customer'});
+ if(savedService.isCustom)return res.status(409).json({message:'Custom work must be booked by accepting the approved quote.'});
  const unitType=(savedService.unitConfig as any)?.unitType||(savedService.pricePerSqFt>0&&savedService.pricePerUnit===0?'square':'unit');
  const totalAmount=(savedService.basePrice||0)+units*(unitType==='square'?(savedService.pricePerSqFt||0):(savedService.pricePerUnit||0));
  const booking=new Booking({...bookingSnapshots(savedService,customer,units,unitType),user,service,worker:worker||undefined,workers:worker?[worker]:[],address:address.trim(),squareFootage:units,units,unitType,scheduledDate,scheduledTime,totalAmount,status:worker?'confirmed':'pending',paymentStatus:'pending'});

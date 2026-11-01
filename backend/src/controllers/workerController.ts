@@ -1,3 +1,4 @@
+import {verifiedWorkPhotoRequirement} from '../services/workPhotos';
 import { Request, Response } from 'express';
 import Booking from '../models/Booking';
 import User from '../models/User';
@@ -60,6 +61,8 @@ export const updateBookingStatusByWorker = async (req: AuthenticatedRequest, res
 
     const expected = status === 'in-progress' ? 'confirmed' : 'in-progress';
     if (booking.status !== expected) return res.status(400).json({ message: 'Invalid booking status transition' });
+    const photoError = await verifiedWorkPhotoRequirement(booking, status);
+    if (photoError) return res.status(409).json({ message: photoError });
     booking.status = status;
 
     const updatedBooking = await booking.save();

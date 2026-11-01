@@ -7,6 +7,7 @@ const bookingSchema = new mongoose.Schema({
   worker: { type: Schema.Types.ObjectId, ref: 'User' }, // Keeping for compatibility (primary worker)
   workers: [{ type: Schema.Types.ObjectId, ref: 'User' }], // Array of all assigned workers
 
+  customRequest: {type:Schema.Types.ObjectId,ref:'CustomCleaningRequest',unique:true,sparse:true},
   // Customer and booking details
   address: { type: String, required: true },
   squareFootage: { type: Number, required: true }, // Keeping for compatibility, but used as generic units

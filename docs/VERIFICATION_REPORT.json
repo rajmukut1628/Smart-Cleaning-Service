@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-10-22T10:10:42.935Z",
+  "runAt": "2026-11-01T04:32:38.200Z",
   "environment": "Disposable local MongoDB replica set; synthetic accounts only",
   "checks": [
     {
@@ -28,6 +28,14 @@
     },
     {
       "name": "Payment reversal removes revenue and invalidates receipts; timeline records actors and chat persists",
+      "result": "passed"
+    },
+    {
+      "name": "Custom quote notifications are customer-scoped, support read receipts and open the exact request",
+      "result": "passed"
+    },
+    {
+      "name": "Custom requests isolate customers/workers, require admin quotes, reject stale/tampered prices and create exactly one booking under concurrent acceptance",
       "result": "passed"
     },
     {
@@ -82,14 +90,15 @@
   "status": "passed",
   "snapshotCounts": {
     "users": 6,
-    "bookings": 2,
-    "services": 1,
+    "bookings": 3,
+    "services": 2,
     "unitconfigs": 1,
     "reviews": 1,
     "messages": 1,
     "platformownerships": 1,
-    "activitylogs": 20,
-    "supporttickets": 1
+    "activitylogs": 30,
+    "supporttickets": 1,
+    "customcleaningrequests": 2
   },
   "notes": [
     "Real HTTP routes, authentication, Mongoose queries and MongoDB transactions were used; no model mocks.",

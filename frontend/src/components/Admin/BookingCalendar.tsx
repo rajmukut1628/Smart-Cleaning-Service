@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import {useCallback,useEffect,useState} from 'react';
+import axios from 'axios';
+import BookingDetailsModal from './BookingDetailsModal';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import type { ToolbarProps, EventProps, View } from 'react-big-calendar';
-import { CalendarDays, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns/format';
 import { parse } from 'date-fns/parse';
 import { startOfWeek } from 'date-fns/startOfWeek';
 import { getDay } from 'date-fns/getDay';
 import { enUS } from 'date-fns/locale/en-US';
-import axios from 'axios';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 // Setup the localizer by providing the moment Object
@@ -26,10 +27,11 @@ const localizer = dateFnsLocalizer({
 interface Booking {
   _id: string;
   service: { name: string; duration?: number };
-  user: { name: string };
+  user: { name: string; email: string };
+ address: string; workers: { _id: string; name: string }[]; totalAmount: number; createdAt: string;
   scheduledDate: string;
   scheduledTime: string; // e.g., "10:00"
-  status: string;
+  status: 'pending' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled';
 }
 
 interface CalendarEvent {
@@ -59,11 +61,7 @@ function BookingEvent({ event }: EventProps<CalendarEvent>) {
   return <div className="booking-calendar-event"><div><strong>{event.resource?.service.name || event.title}</strong><time>{format(event.start, 'HH:mm')}</time></div><span>{event.resource?.user.name}</span></div>;
 }
 
-const BookingCalendar = () => {
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+const BookingCalendar = ({bookings,onSelectBooking}: {bookings: Booking[];onSelectBooking: (booking: Booking)=>void}) => {
   const transformBookingsToEvents = (bookings: Booking[]): CalendarEvent[] => {
     return bookings
       .filter(booking => booking && booking.user && booking.service) // Ensure booking, user, and service are not null
@@ -89,34 +87,14 @@ const BookingCalendar = () => {
     className: 'booking-event-' + (event.status || 'confirmed'),
   });
 
-  const fetchBookings = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const response = await axios.get('/api/admin/bookings');
-      const calendarEvents = transformBookingsToEvents(response.data);
-      setEvents(calendarEvents);
-      setError(null);
-    } catch (err) {
-      console.error("Failed to fetch bookings:", err);
-      setError('Could not load booking data.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
-
-  if (isLoading) return <div className="booking-calendar-state" role="status"><RotateCw size={22} className="animate-spin"/><p>Loading your booking schedule…</p></div>;
-  if (error) return <div className="booking-calendar-state" role="alert"><p>{error}</p><button type="button" onClick={() => void fetchBookings()}>Try again</button></div>;
-
+  const events = transformBookingsToEvents(bookings);
   return <div className="booking-calendar-studio">
     <header className="booking-calendar-heading"><div className="booking-calendar-heading-copy"><span className="booking-calendar-mark"><CalendarDays size={21}/></span><div><h3>Booking calendar</h3><p>Plan your team’s day. Keep every booking in view.</p></div></div><span className="booking-calendar-total">{events.length} scheduled {events.length === 1 ? 'booking' : 'bookings'}</span></header>
     <div className="booking-calendar-legend" aria-label="Booking status colours">{statuses.map(status => <span key={status.value} className={'booking-legend-' + status.value}><i aria-hidden="true"/>{status.label}</span>)}</div>
     <Calendar<CalendarEvent>
       localizer={localizer}
       events={events}
+      onSelectEvent={event => { if(event.resource) onSelectBooking(event.resource); }}
       startAccessor="start"
       endAccessor="end"
       views={['month', 'week', 'day', 'agenda']}
@@ -128,4 +106,14 @@ const BookingCalendar = () => {
   </div>;
 };
 
-export default BookingCalendar;
+
+function StandaloneCalendar(){
+ const [bookings,setBookings]=useState<Booking[]>([]),[selected,setSelected]=useState<Booking|null>(null),[error,setError]=useState(false),[loading,setLoading]=useState(true);
+ const load=useCallback(async()=>{try{const {data}=await axios.get('/api/admin/bookings');setBookings(data);setError(false);}catch{setError(true);}finally{setLoading(false);}},[]);
+ useEffect(()=>{void load();const timer=setInterval(()=>{if(document.visibilityState==='visible')void load();},30000);return()=>clearInterval(timer);},[load]);
+ if(loading)return <p role="status">Loading booking calendar…</p>;
+ return <>{error&&<p role="alert">Unable to refresh bookings. <button onClick={()=>void load()}>Try again</button></p>}<BookingCalendar bookings={bookings} onSelectBooking={setSelected}/>{selected&&<BookingDetailsModal booking={selected} onClose={()=>{setSelected(null);void load();}}/>}</>;
+}
+export default function CalendarSurface(props:{bookings?:Booking[];onSelectBooking?:(booking:Booking)=>void}){
+ return props.bookings&&props.onSelectBooking?<BookingCalendar bookings={props.bookings} onSelectBooking={props.onSelectBooking}/>:<StandaloneCalendar/>;
+}

@@ -9,7 +9,7 @@ interface ImageUploadProps {
   bookingId: string;
   type: 'before' | 'after';
   existingImages?: string[];
-  onSuccess: () => void;
+  onSuccess: (images?: string[]) => void;
   onClose: () => void;
 }
 
@@ -95,7 +95,7 @@ export default function ImageUpload({
       );
 
       toast.success(`${type === 'before' ? 'Before' : 'After'} images uploaded successfully!`);
-      onSuccess();
+      onSuccess([...existingImages, ...uploadedUrls]);
       onClose();
     } catch (error: unknown) {
       console.error('Upload error:', error);

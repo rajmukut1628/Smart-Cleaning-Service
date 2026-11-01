@@ -11,7 +11,7 @@ const serviceSchema = new mongoose.Schema({
   duration: { type: Number, required: true, min:0.25,max:24 }, // duration in hours
   image: { type: String, default: '' }, // Optional image
   features: [{ type: String }],
-  isCustom: { type: Boolean, default: false }, // true for user-created services
+  isCustom: { type: Boolean, default: false }, // Private customer-specific service, including accepted custom quotes
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // user who created this service
 }, {
   timestamps: true,

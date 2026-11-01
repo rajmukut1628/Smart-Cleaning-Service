@@ -1,5 +1,5 @@
 import {validFutureSchedule,bookingSnapshots} from '../services/bookingRules';
-import { isUploadedImage } from '../utils/imageStorage';
+import { isUploadedImage, uploadedImageExists } from '../utils/imageStorage';
 import { Request, Response } from 'express';
 import Booking from '../models/Booking';
 import Service from '../models/Service'; // Needed to calculate price
@@ -48,6 +48,8 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     const units = Number(squareFootage);
     if (!Number.isFinite(units) || units <= 0 || !validFutureSchedule(scheduledDate,scheduledTime)) return res.status(400).json({ message: 'Valid quantity, date and time are required' });
     if (service.isCustom && service.createdBy?.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'This custom service belongs to another customer' });
+
+    if (service.isCustom) return res.status(409).json({ message: 'Custom work requires an approved quote. Accept your quote from Custom cleaning requests.' });
 
     // Calculation logic mirroring frontend:
     if (unitType === 'square') {
@@ -124,6 +126,9 @@ export const uploadBeforeImages = async (req: AuthenticatedRequest, res: Respons
       return res.status(403).json({ message: 'Not authorized to upload images for this booking' });
     }
 
+    if (['completed','cancelled'].includes(booking.status)) return res.status(409).json({ message: 'Photos cannot be changed after a job is finished or cancelled.' });
+    if (booking.status === 'in-progress' && !images.length) return res.status(409).json({ message: 'Keep at least one before photo while work is in progress.' });
+    if (!(await Promise.all(images.map(uploadedImageExists))).every(Boolean)) return res.status(400).json({ message: 'One or more photos are missing from image storage. Upload them again.' });
     booking.beforeImages = images;
     await booking.save();
 
@@ -157,6 +162,8 @@ export const uploadAfterImages = async (req: AuthenticatedRequest, res: Response
       return res.status(403).json({ message: 'Not authorized to upload images for this booking' });
     }
 
+    if (booking.status !== 'in-progress') return res.status(409).json({ message: 'After photos can only be uploaded while the job is in progress.' });
+    if (!(await Promise.all(images.map(uploadedImageExists))).every(Boolean)) return res.status(400).json({ message: 'One or more photos are missing from image storage. Upload them again.' });
     booking.afterImages = images;
     await booking.save();
 

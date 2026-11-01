@@ -1,6 +1,6 @@
 # Booking and recovery verification
 
-Run: 2026-10-22T10:10:42.935Z
+Run: 2026-11-01T04:32:38.200Z
 
 Result: **PASSED**
 
@@ -11,6 +11,8 @@ Result: **PASSED**
 - PASS: Only the assigned worker completes work; unpaid completed work contributes zero revenue
 - PASS: Cash confirmation updates receipt, earnings and revenue exactly once; notification reads persist
 - PASS: Payment reversal removes revenue and invalidates receipts; timeline records actors and chat persists
+- PASS: Custom quote notifications are customer-scoped, support read receipts and open the exact request
+- PASS: Custom requests isolate customers/workers, require admin quotes, reject stale/tampered prices and create exactly one booking under concurrent acceptance
 - PASS: Audit fixes: block/unblock restores worker role, bulk delete works, verified email cannot be bypassed and password changes revoke sessions
 - PASS: Worker working hours are enforced during new admin assignments
 - PASS: Audit fixes: review emails are private; past dates, lifecycle bypass and inaccessible admin-to-worker messages are rejected
@@ -27,14 +29,15 @@ Result: **PASSED**
 ## Restored snapshot counts
 
 - users: 6
-- bookings: 2
-- services: 1
+- bookings: 3
+- services: 2
 - unitconfigs: 1
 - reviews: 1
 - messages: 1
 - platformownerships: 1
-- activitylogs: 20
+- activitylogs: 30
 - supporttickets: 1
+- customcleaningrequests: 2
 
 - Real HTTP routes, authentication, Mongoose queries and MongoDB transactions were used; no model mocks.
 - No live account, hosted API, production database or real email was used. The email-change transport alone was intercepted for OTP verification.
